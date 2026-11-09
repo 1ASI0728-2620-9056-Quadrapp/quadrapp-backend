@@ -1,0 +1,53 @@
+package com.upc.quadrapp.iam.interfaces.acl;
+
+import com.upc.quadrapp.iam.application.internal.commandservices.IamAuthorizationService;
+import com.upc.quadrapp.iam.domain.model.aggregates.User;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+
+@Component
+@RequiredArgsConstructor
+public class IamContextFacade {
+
+    private final IamAuthorizationService authorizationService;
+
+    public CurrentUserIdentity getCurrentUser() {
+
+        User user = authorizationService.requireAuthenticatedUser();
+
+        return new CurrentUserIdentity(
+                user.getId(),
+                user.getInstitutionId(),
+                user.getRole().name(),
+                user.getLocale()
+        );
+    }
+
+    public void requireInstitutionAccess(Long institutionId) {
+
+        User actor = authorizationService.requireAuthenticatedUser();
+
+        authorizationService.requireInstitutionAccess(
+                actor,
+                institutionId
+        );
+    }
+
+    public void requireInstitutionAdmin(Long institutionId) {
+
+        User actor = authorizationService.requireAuthenticatedUser();
+
+        authorizationService.requireInstitutionAdmin(
+                actor,
+                institutionId
+        );
+    }
+
+    public record CurrentUserIdentity(
+            Long userId,
+            Long institutionId,
+            String role,
+            String locale
+    ) {}
+}
