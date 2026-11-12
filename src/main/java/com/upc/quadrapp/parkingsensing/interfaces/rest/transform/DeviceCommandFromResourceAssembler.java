@@ -1,10 +1,7 @@
 package com.upc.quadrapp.parkingsensing.interfaces.rest.transform;
 
-import com.upc.quadrapp.parkingsensing.domain.model.commands.AssignDeviceCommand;
-import com.upc.quadrapp.parkingsensing.domain.model.commands.DecommissionDeviceCommand;
-import com.upc.quadrapp.parkingsensing.domain.model.commands.RegisterDeviceCommand;
-import com.upc.quadrapp.parkingsensing.interfaces.rest.resources.AssignDeviceResource;
-import com.upc.quadrapp.parkingsensing.interfaces.rest.resources.RegisterDeviceResource;
+import com.upc.quadrapp.parkingsensing.domain.model.commands.*;
+import com.upc.quadrapp.parkingsensing.interfaces.rest.resources.*;
 
 public final class DeviceCommandFromResourceAssembler {
 
@@ -12,6 +9,7 @@ public final class DeviceCommandFromResourceAssembler {
 
     public static RegisterDeviceCommand toCommand(
             Long institutionId,
+            Long actorId,
             RegisterDeviceResource resource
     ) {
         return new RegisterDeviceCommand(
@@ -19,7 +17,11 @@ public final class DeviceCommandFromResourceAssembler {
                 resource.parkingLotId(),
                 resource.hardwareId(),
                 resource.type(),
-                resource.reportIntervalSeconds()
+                resource.reportIntervalSeconds(),
+                resource.gatewayId(),
+                resource.directional(),
+                resource.firmwareVersion(),
+                actorId
         );
     }
 
@@ -34,7 +36,9 @@ public final class DeviceCommandFromResourceAssembler {
         );
     }
 
-    public static DecommissionDeviceCommand toDecommissionCommand(Long deviceId) {
+    public static DecommissionDeviceCommand toDecommissionCommand(
+            Long deviceId
+    ) {
         return new DecommissionDeviceCommand(deviceId);
     }
 }

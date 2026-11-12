@@ -8,6 +8,7 @@ import com.upc.quadrapp.parkingconfiguration.interfaces.rest.resources.CreateAcc
 import com.upc.quadrapp.parkingconfiguration.interfaces.rest.transform.ParkingConfigurationCommandFromResourceAssembler;
 import com.upc.quadrapp.parkingconfiguration.interfaces.rest.transform.ParkingConfigurationResourceFromEntityAssembler;
 
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@SecurityRequirement(name = "bearerAuth")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping(value = "/api/v1/parking-lots/{parkingLotId}/accesses", produces = MediaType.APPLICATION_JSON_VALUE)

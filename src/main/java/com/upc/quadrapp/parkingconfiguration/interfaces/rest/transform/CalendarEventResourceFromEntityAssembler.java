@@ -7,9 +7,8 @@ public final class CalendarEventResourceFromEntityAssembler {
 
     private CalendarEventResourceFromEntityAssembler() {}
 
-    public static CalendarEventResource toResourceFromEntity(
-            CalendarEvent event
-    ) {
+    public static CalendarEventResource toResourceFromEntity(CalendarEvent event)
+    {
         return new CalendarEventResource(
                 event.getId(),
                 event.getInstitutionId(),
@@ -18,7 +17,12 @@ public final class CalendarEventResourceFromEntityAssembler {
                 event.getCreatedBy(),
                 event.getName(),
                 event.getWindow().startAt(),
-                event.getWindow().endAt()
+                event.getWindow().endAt(),
+                event.getType(),
+                event.getImpact(),
+                event.getCancelledAt(),
+                event.getCreatedAt(),
+                event.getUpdatedAt()
         );
     }
 }

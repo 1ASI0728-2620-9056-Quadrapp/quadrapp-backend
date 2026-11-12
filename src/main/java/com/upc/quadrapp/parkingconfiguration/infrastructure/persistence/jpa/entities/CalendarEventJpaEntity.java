@@ -1,5 +1,8 @@
 package com.upc.quadrapp.parkingconfiguration.infrastructure.persistence.jpa.entities;
 
+import com.upc.quadrapp.parkingconfiguration.domain.model.valueobjects.CalendarEventType;
+import com.upc.quadrapp.parkingconfiguration.domain.model.valueobjects.EventImpact;
+
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -21,7 +24,7 @@ public class CalendarEventJpaEntity {
     @Column(name = "institution_id", nullable = false)
     private Long institutionId;
 
-    @Column(name = "parking_lot_id")
+    @Column(name = "lot_id")
     private Long parkingLotId;
 
     @Column(name = "zone_id")
@@ -30,12 +33,29 @@ public class CalendarEventJpaEntity {
     @Column(name = "created_by")
     private Long createdBy;
 
-    @Column(name = "name", nullable = false)
+    @Column(name = "name", nullable = false, length = 120)
     private String name;
 
-    @Column(name = "start_at", nullable = false)
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type", nullable = false, length = 15)
+    private CalendarEventType type;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "impact", nullable = false, length = 6)
+    private EventImpact impact;
+
+    @Column(name = "starts_at", nullable = false, columnDefinition = "timestamptz")
     private Instant startAt;
 
-    @Column(name = "end_at", nullable = false)
+    @Column(name = "ends_at", nullable = false, columnDefinition = "timestamptz")
     private Instant endAt;
+
+    @Column(name = "cancelled_at", columnDefinition = "timestamptz")
+    private Instant cancelledAt;
+
+    @Column(name = "created_at", nullable = false, columnDefinition = "timestamptz")
+    private Instant createdAt;
+
+    @Column(name = "updated_at", nullable = false, columnDefinition = "timestamptz")
+    private Instant updatedAt;
 }

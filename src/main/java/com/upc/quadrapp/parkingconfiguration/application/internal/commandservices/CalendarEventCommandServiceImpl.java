@@ -8,8 +8,9 @@ import com.upc.quadrapp.parkingconfiguration.domain.model.commands.ScheduleCalen
 import com.upc.quadrapp.parkingconfiguration.domain.model.valueobjects.EventWindow;
 import com.upc.quadrapp.parkingconfiguration.domain.services.CalendarEventCommandService;
 
-public final class CalendarEventCommandServiceImpl
-        implements CalendarEventCommandService {
+import org.springframework.security.access.AccessDeniedException;
+
+public final class CalendarEventCommandServiceImpl implements CalendarEventCommandService {
 
     private final CalendarEventPersistencePort events;
     private final ParkingLotPersistencePort lots;
@@ -32,7 +33,6 @@ public final class CalendarEventCommandServiceImpl
     public CalendarEvent handle(
             ScheduleCalendarEventCommand command
     ) {
-
         authorization.requireInstitutionWrite(
                 command.institutionId()
         );
@@ -49,7 +49,7 @@ public final class CalendarEventCommandServiceImpl
             if (!lot.getInstitutionId().equals(
                     command.institutionId()
             )) {
-                throw new IllegalArgumentException(
+                throw new AccessDeniedException(
                         "Parking lot belongs to another institution."
                 );
             }
@@ -82,7 +82,9 @@ public final class CalendarEventCommandServiceImpl
                 new EventWindow(
                         command.startAt(),
                         command.endAt()
-                )
+                ),
+                command.type(),
+                command.impact()
         );
 
         return events.save(event);

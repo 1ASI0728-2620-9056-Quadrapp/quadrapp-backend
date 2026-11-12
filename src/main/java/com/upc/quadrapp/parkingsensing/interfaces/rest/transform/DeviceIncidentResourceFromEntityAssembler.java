@@ -7,7 +7,9 @@ public final class DeviceIncidentResourceFromEntityAssembler {
 
     private DeviceIncidentResourceFromEntityAssembler() {}
 
-    public static DeviceIncidentResource toResourceFromEntity(DeviceIncident incident) {
+    public static DeviceIncidentResource toResourceFromEntity(
+            DeviceIncident incident
+    ) {
         return new DeviceIncidentResource(
                 incident.getId(),
                 incident.getInstitutionId(),
@@ -15,6 +17,9 @@ public final class DeviceIncidentResourceFromEntityAssembler {
                 incident.getDeviceId(),
                 incident.getHardwareId(),
                 incident.getType(),
+                incident.getCategory(),
+                incident.getReportedBy(),
+                incident.getResolvedBy(),
                 incident.getDetails(),
                 incident.getOccurredAt(),
                 incident.getResolvedAt(),

@@ -7,11 +7,8 @@ public final class CalendarEventCommandFromResourceAssembler {
 
     private CalendarEventCommandFromResourceAssembler() {}
 
-    public static ScheduleCalendarEventCommand toCommand(
-            Long institutionId,
-            Long actorId,
-            ScheduleCalendarEventResource resource
-    ) {
+    public static ScheduleCalendarEventCommand toCommand(Long institutionId, Long actorId, ScheduleCalendarEventResource resource)
+    {
         return new ScheduleCalendarEventCommand(
                 institutionId,
                 resource.parkingLotId(),
@@ -19,7 +16,9 @@ public final class CalendarEventCommandFromResourceAssembler {
                 actorId,
                 resource.name(),
                 resource.startAt(),
-                resource.endAt()
+                resource.endAt(),
+                resource.type(),
+                resource.impact()
         );
     }
 }

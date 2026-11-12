@@ -3,6 +3,7 @@ package com.upc.quadrapp.iam.interfaces.rest;
 import com.upc.quadrapp.iam.domain.model.valueobjects.Roles;
 import com.upc.quadrapp.iam.interfaces.rest.resources.RoleResource;
 
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 import org.springframework.http.MediaType;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Arrays;
 import java.util.List;
 
+@SecurityRequirement(name = "bearerAuth")
 @RestController
 @RequestMapping(value = "/api/v1/iam/roles", produces = MediaType.APPLICATION_JSON_VALUE)
 @Tag(name = "Roles", description = "Available institutional invitation roles")

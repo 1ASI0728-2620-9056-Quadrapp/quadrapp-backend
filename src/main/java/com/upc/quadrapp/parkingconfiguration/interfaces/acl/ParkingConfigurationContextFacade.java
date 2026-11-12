@@ -1,75 +1,61 @@
 package com.upc.quadrapp.parkingconfiguration.interfaces.acl;
 
-import com.upc.quadrapp.parkingconfiguration.domain.model.queries.*;
-import com.upc.quadrapp.parkingconfiguration.domain.services.ParkingConfigurationQueryService;
+import com.upc.quadrapp.parkingconfiguration.application.internal.outboundservices.authorization.ParkingConfigurationAuthorizationPort;
+import com.upc.quadrapp.parkingconfiguration.application.internal.outboundservices.persistence.ParkingLotPersistencePort;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 @Component
 @RequiredArgsConstructor
 public class ParkingConfigurationContextFacade {
 
-    private final ParkingConfigurationQueryService queries;
+    private final ParkingLotPersistencePort parkingLots;
+    private final ParkingConfigurationAuthorizationPort authorization;
 
-    public Optional<ParkingLotView> getParkingLot(
+    public Optional<ParkingLotView> findParkingLot(
+            Long institutionId,
             Long parkingLotId
     ) {
-        return queries.handle(
-                new GetParkingLotByIdQuery(parkingLotId)
-        ).map(value ->
-                new ParkingLotView(
-                        value.getId(),
-                        value.getInstitutionId(),
-                        value.getName()
-                )
+        Objects.requireNonNull(
+                institutionId,
+                "Institution ID is required."
         );
-    }
 
-    public List<ParkingLotView> getParkingLotsByInstitution(
-            Long institutionId
-    ) {
-        return queries.handle(
-                        new GetParkingLotsByInstitutionQuery(institutionId)
-                ).stream()
-                .map(value ->
+        Objects.requireNonNull(
+                parkingLotId,
+                "Parking lot ID is required."
+        );
+
+        authorization.requireInstitutionRead(institutionId);
+
+        return parkingLots.findById(parkingLotId)
+                .filter(lot ->
+                        institutionId.equals(lot.getInstitutionId())
+                )
+                .map(lot ->
                         new ParkingLotView(
-                                value.getId(),
-                                value.getInstitutionId(),
-                                value.getName()
+                                lot.getId(),
+                                lot.getInstitutionId()
                         )
-                )
-                .toList();
+                );
     }
 
-    public List<SpaceView> getSpacesByLevel(
-            Long levelId
+    public boolean belongsToInstitution(
+            Long institutionId,
+            Long parkingLotId
     ) {
-        return queries.handle(
-                        new GetSpacesByLevelQuery(levelId)
-                ).stream()
-                .map(value ->
-                        new SpaceView(
-                                value.getId(),
-                                value.getLevelId(),
-                                value.getLabel()
-                        )
-                )
-                .toList();
+        return findParkingLot(
+                institutionId,
+                parkingLotId
+        ).isPresent();
     }
 
     public record ParkingLotView(
             Long id,
-            Long institutionId,
-            String name
-    ) {}
-
-    public record SpaceView(
-            Long id,
-            Long levelId,
-            String label
+            Long institutionId
     ) {}
 }

@@ -5,9 +5,11 @@ public record HardwareIdentifier(String value) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException("hardwareId is required.");
         }
+
         value = value.trim();
-        if (value.length() > 128) {
-            throw new IllegalArgumentException("hardwareId is too long.");
+
+        if (value.length() > 80) {
+            throw new IllegalArgumentException("hardwareId must not exceed 80 characters.");
         }
     }
 }

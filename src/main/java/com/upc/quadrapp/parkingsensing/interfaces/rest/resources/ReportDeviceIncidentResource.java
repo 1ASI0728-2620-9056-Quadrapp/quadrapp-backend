@@ -1,16 +1,11 @@
 package com.upc.quadrapp.parkingsensing.interfaces.rest.resources;
 
-import com.upc.quadrapp.parkingsensing.domain.model.valueobjects.IncidentType;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
-import java.time.Instant;
+import com.upc.quadrapp.parkingsensing.domain.model.valueobjects.IncidentCategory;
 
-public record ReportDeviceIncidentResource(
-        @Positive Long parkingLotId,
-        @Positive Long deviceId,
-        @NotBlank String hardwareId,
-        @NotNull IncidentType type,
-        String details,
-        @NotNull Instant occurredAt
-) {}
+import jakarta.validation.constraints.*;
+
+public record ReportDeviceIncidentResource(@NotNull @Positive Long parkingLotId,
+                                           @Positive Long deviceId,
+                                           @Size(max = 80) String hardwareId,
+                                           @NotNull IncidentCategory category,
+                                           String details) {}

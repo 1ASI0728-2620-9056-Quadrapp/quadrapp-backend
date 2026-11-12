@@ -7,7 +7,9 @@ public final class DeviceResourceFromEntityAssembler {
 
     private DeviceResourceFromEntityAssembler() {}
 
-    public static DeviceResource toResourceFromEntity(Device device) {
+    public static DeviceResource toResourceFromEntity(
+            Device device
+    ) {
         return new DeviceResource(
                 device.getId(),
                 device.getInstitutionId(),
@@ -16,10 +18,18 @@ public final class DeviceResourceFromEntityAssembler {
                 device.getType(),
                 device.getReportIntervalSeconds(),
                 device.getStatus(),
+                device.getGatewayId(),
                 device.getSpaceId(),
                 device.getAccessId(),
+                device.getReplacedBy(),
+                device.getRegisteredBy(),
+                device.getDirectional(),
+                device.getBatteryPct(),
+                device.getFirmwareVersion(),
                 device.getLastSeenAt(),
-                device.getRegisteredAt()
+                device.getDecommissionedAt(),
+                device.getRegisteredAt(),
+                device.getUpdatedAt()
         );
     }
 }

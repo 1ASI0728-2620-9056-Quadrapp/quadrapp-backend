@@ -14,6 +14,7 @@ import com.upc.quadrapp.iam.interfaces.rest.resources.*;
 import com.upc.quadrapp.iam.interfaces.rest.transform.InstitutionDomainResourceFromEntityAssembler;
 import com.upc.quadrapp.iam.interfaces.rest.transform.InstitutionResourceFromEntityAssembler;
 
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
+@SecurityRequirement(name = "bearerAuth")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping(value = "/api/v1/iam/institutions", produces = MediaType.APPLICATION_JSON_VALUE)

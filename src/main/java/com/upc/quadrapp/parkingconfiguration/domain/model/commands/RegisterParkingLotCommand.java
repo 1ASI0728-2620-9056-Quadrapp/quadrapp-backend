@@ -1,17 +1,16 @@
 package com.upc.quadrapp.parkingconfiguration.domain.model.commands;
 
-public record RegisterParkingLotCommand(Long institutionId, String name) {
-    public RegisterParkingLotCommand {
-        if (institutionId == null || institutionId <= 0) {
-            throw new IllegalArgumentException(
-                    "institutionId must be positive."
-            );
-        }
+import java.math.BigDecimal;
+import java.time.LocalTime;
 
-        if (name == null || name.isBlank()) {
-            throw new IllegalArgumentException(
-                    "name is required."
-            );
+public record RegisterParkingLotCommand(Long institutionId, Long createdBy, String name, String address,
+        BigDecimal latitude, BigDecimal longitude, LocalTime opensAt, LocalTime closesAt, Integer saturationThresholdPct,
+        Integer lowBatteryThresholdPct, Integer staleAfterSeconds, Integer flowWindowMinutes, Integer accuracyMarginPct,
+        Integer occupiedDebounceS, Integer freedDebounceS)
+{
+    public RegisterParkingLotCommand {
+        if (institutionId == null || institutionId <= 0 || name == null || name.isBlank()) {
+            throw new IllegalArgumentException("institutionId and name are required.");
         }
     }
 }

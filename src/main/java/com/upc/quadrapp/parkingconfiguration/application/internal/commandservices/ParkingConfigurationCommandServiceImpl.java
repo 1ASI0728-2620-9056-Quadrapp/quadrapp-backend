@@ -43,7 +43,27 @@ public final class ParkingConfigurationCommandServiceImpl
 
         ParkingLot value = ParkingLot.register(
                 command.institutionId(),
-                command.name()
+                command.createdBy(),
+                command.name(),
+                command.address(),
+                command.latitude(),
+                command.longitude(),
+                command.opensAt(),
+                command.closesAt(),
+                command.saturationThresholdPct() == null
+                        ? 90 : command.saturationThresholdPct(),
+                command.lowBatteryThresholdPct() == null
+                        ? 15 : command.lowBatteryThresholdPct(),
+                command.staleAfterSeconds() == null
+                        ? 180 : command.staleAfterSeconds(),
+                command.flowWindowMinutes() == null
+                        ? 15 : command.flowWindowMinutes(),
+                command.accuracyMarginPct() == null
+                        ? 10 : command.accuracyMarginPct(),
+                command.occupiedDebounceS() == null
+                        ? 10 : command.occupiedDebounceS(),
+                command.freedDebounceS() == null
+                        ? 20 : command.freedDebounceS()
         );
 
         if (lots.existsByInstitutionIdAndName(
@@ -61,9 +81,7 @@ public final class ParkingConfigurationCommandServiceImpl
     @Override
     public Zone handle(CreateZoneCommand command) {
 
-        ParkingLot lot = requireLot(
-                command.parkingLotId()
-        );
+        ParkingLot lot = requireLot(command.parkingLotId());
 
         authorization.requireInstitutionWrite(
                 lot.getInstitutionId()
@@ -71,7 +89,10 @@ public final class ParkingConfigurationCommandServiceImpl
 
         Zone value = Zone.create(
                 lot.getId(),
-                command.name()
+                command.name(),
+                command.description(),
+                command.sortOrder() == null
+                        ? 0 : command.sortOrder()
         );
 
         if (zones.existsByParkingLotIdAndName(
@@ -91,9 +112,7 @@ public final class ParkingConfigurationCommandServiceImpl
 
         Zone zone = requireZone(command.zoneId());
 
-        ParkingLot lot = requireLot(
-                zone.getParkingLotId()
-        );
+        ParkingLot lot = requireLot(zone.getParkingLotId());
 
         authorization.requireInstitutionWrite(
                 lot.getInstitutionId()
@@ -101,7 +120,9 @@ public final class ParkingConfigurationCommandServiceImpl
 
         Level value = Level.create(
                 zone.getId(),
-                command.name()
+                command.name(),
+                command.sortOrder() == null
+                        ? 0 : command.sortOrder()
         );
 
         if (levels.existsByZoneIdAndName(
@@ -126,13 +147,9 @@ public final class ParkingConfigurationCommandServiceImpl
                         )
                 );
 
-        Zone zone = requireZone(
-                level.getZoneId()
-        );
+        Zone zone = requireZone(level.getZoneId());
 
-        ParkingLot lot = requireLot(
-                zone.getParkingLotId()
-        );
+        ParkingLot lot = requireLot(zone.getParkingLotId());
 
         authorization.requireInstitutionWrite(
                 lot.getInstitutionId()
@@ -140,7 +157,10 @@ public final class ParkingConfigurationCommandServiceImpl
 
         Space value = Space.create(
                 level.getId(),
-                command.label()
+                command.label(),
+                command.type(),
+                command.posX(),
+                command.posY()
         );
 
         if (spaces.existsByLevelIdAndLabel(
@@ -158,9 +178,7 @@ public final class ParkingConfigurationCommandServiceImpl
     @Override
     public Access handle(CreateAccessCommand command) {
 
-        ParkingLot lot = requireLot(
-                command.parkingLotId()
-        );
+        ParkingLot lot = requireLot(command.parkingLotId());
 
         authorization.requireInstitutionWrite(
                 lot.getInstitutionId()
@@ -168,7 +186,9 @@ public final class ParkingConfigurationCommandServiceImpl
 
         Access value = Access.create(
                 lot.getId(),
-                command.name()
+                command.name(),
+                command.type(),
+                Boolean.TRUE.equals(command.flowCountingEnabled())
         );
 
         if (accesses.existsByParkingLotIdAndName(
@@ -184,7 +204,6 @@ public final class ParkingConfigurationCommandServiceImpl
     }
 
     private ParkingLot requireLot(Long id) {
-
         return lots.findById(id)
                 .orElseThrow(
                         () -> new IllegalArgumentException(
@@ -194,7 +213,6 @@ public final class ParkingConfigurationCommandServiceImpl
     }
 
     private Zone requireZone(Long id) {
-
         return zones.findById(id)
                 .orElseThrow(
                         () -> new IllegalArgumentException(

@@ -16,9 +16,7 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-@RestControllerAdvice(
-        basePackages = "com.upc.quadrapp.iam.interfaces.rest"
-)
+@RestControllerAdvice(basePackages = "com.upc.quadrapp.iam.interfaces.rest")
 public class IamExceptionHandler {
 
     @ExceptionHandler(IllegalArgumentException.class)
