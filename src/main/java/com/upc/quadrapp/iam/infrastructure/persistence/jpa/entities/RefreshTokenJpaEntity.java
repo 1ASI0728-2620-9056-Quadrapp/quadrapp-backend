@@ -9,7 +9,7 @@ import lombok.Setter;
 import java.time.Instant;
 
 @Entity
-@Table(name = "refresh_tokens", uniqueConstraints = @UniqueConstraint(name = "uk_refresh_tokens_token_hash", columnNames = "token_hash"))
+@Table(schema = "iam", name = "refresh_tokens", uniqueConstraints = @UniqueConstraint(name = "uk_refresh_tokens_token_hash", columnNames = "token_hash"))
 @Getter
 @Setter
 @NoArgsConstructor

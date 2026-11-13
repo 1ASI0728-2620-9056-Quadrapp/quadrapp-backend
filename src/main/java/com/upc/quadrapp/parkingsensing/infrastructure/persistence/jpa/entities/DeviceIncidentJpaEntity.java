@@ -13,7 +13,7 @@ import org.hibernate.annotations.Formula;
 import java.time.Instant;
 
 @Entity
-@Table(name = "device_incidents")
+@Table(schema = "sensing", name = "device_incidents")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -24,7 +24,7 @@ public class DeviceIncidentJpaEntity {
     private Long id;
 
     @Formula(
-            "(select lot.institution_id from parking_lots lot where lot.id = lot_id)"
+            "(select lot.institution_id from configuration.parking_lots lot where lot.id = lot_id)"
     )
     @Setter(AccessLevel.NONE)
     private Long institutionId;

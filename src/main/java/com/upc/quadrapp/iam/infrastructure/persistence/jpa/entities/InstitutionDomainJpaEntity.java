@@ -9,7 +9,7 @@ import lombok.Setter;
 import java.time.Instant;
 
 @Entity
-@Table(name = "institution_domains", uniqueConstraints = @UniqueConstraint(name = "uk_institution_domains_domain", columnNames = "domain"),
+@Table(schema = "iam", name = "institution_domains", uniqueConstraints = @UniqueConstraint(name = "uk_institution_domains_domain", columnNames = "domain"),
         check = @CheckConstraint(name = "ck_institution_domains_lowercase", constraint = "domain = lower(domain)"))
 @Getter
 @Setter

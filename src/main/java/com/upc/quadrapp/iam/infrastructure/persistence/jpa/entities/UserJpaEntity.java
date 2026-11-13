@@ -13,6 +13,7 @@ import java.time.Instant;
 
 @Entity
 @Table(
+        schema = "iam",
         name = "users",
         uniqueConstraints = {
                 @UniqueConstraint(
