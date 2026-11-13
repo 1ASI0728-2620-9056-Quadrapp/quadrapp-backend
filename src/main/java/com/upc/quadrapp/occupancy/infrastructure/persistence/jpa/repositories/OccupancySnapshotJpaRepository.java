@@ -21,8 +21,8 @@ public interface OccupancySnapshotJpaRepository
 
     @Query(value = """
             SELECT snapshot.*
-            FROM public.occupancy_snapshots snapshot
-            JOIN public.zones zone ON zone.id = snapshot.zone_id
+            FROM occupancy.occupancy_snapshots snapshot
+            JOIN configuration.zones zone ON zone.id = snapshot.zone_id
             WHERE zone.lot_id = :parkingLotId
             ORDER BY snapshot.taken_at ASC, snapshot.zone_id ASC
             """, nativeQuery = true)
@@ -32,8 +32,8 @@ public interface OccupancySnapshotJpaRepository
 
     @Query(value = """
             SELECT snapshot.*
-            FROM public.occupancy_snapshots snapshot
-            JOIN public.zones zone ON zone.id = snapshot.zone_id
+            FROM occupancy.occupancy_snapshots snapshot
+            JOIN configuration.zones zone ON zone.id = snapshot.zone_id
             WHERE zone.lot_id = :parkingLotId
               AND snapshot.taken_at >= :from
               AND snapshot.taken_at <= :to
@@ -50,9 +50,9 @@ public interface OccupancySnapshotJpaRepository
                    COUNT(*) FILTER (WHERE s.status = 'FREE') AS "freeCount",
                    COUNT(*) FILTER (WHERE s.status = 'OCCUPIED') AS "occupiedCount",
                    COUNT(*) FILTER (WHERE s.status = 'UNKNOWN') AS "unknownCount"
-            FROM public.spaces s
-            JOIN public.levels l ON l.id = s.level_id
-            JOIN public.zones z ON z.id = l.zone_id
+            FROM configuration.spaces s
+            JOIN configuration.levels l ON l.id = s.level_id
+            JOIN configuration.zones z ON z.id = l.zone_id
             WHERE s.active = TRUE
               AND (
                     (:scopeType = 'PARKING_LOT' AND z.lot_id = :scopeId)
@@ -67,22 +67,22 @@ public interface OccupancySnapshotJpaRepository
 
     @Query(value = """
             SELECT z.lot_id
-            FROM public.zones z
+            FROM configuration.zones z
             WHERE z.id = :zoneId
             """, nativeQuery = true)
     Optional<Long> findParkingLotIdForZone(@Param("zoneId") Long zoneId);
 
     @Query(value = """
             SELECT z.lot_id
-            FROM public.levels l
-            JOIN public.zones z ON z.id = l.zone_id
+            FROM configuration.levels l
+            JOIN configuration.zones z ON z.id = l.zone_id
             WHERE l.id = :levelId
             """, nativeQuery = true)
     Optional<Long> findParkingLotIdForLevel(@Param("levelId") Long levelId);
 
     @Query(value = """
             SELECT z.id
-            FROM public.zones z
+            FROM configuration.zones z
             WHERE z.lot_id = :parkingLotId
             ORDER BY z.id
             """, nativeQuery = true)

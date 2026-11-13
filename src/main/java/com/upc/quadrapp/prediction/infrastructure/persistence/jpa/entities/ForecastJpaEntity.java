@@ -12,6 +12,7 @@ import java.time.Instant;
 
 @Entity
 @Table(
+        schema = "prediction",
         name = "forecasts",
         uniqueConstraints = @UniqueConstraint(
                 name = "uk_forecasts_lot_horizon_generated",

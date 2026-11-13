@@ -22,7 +22,7 @@ public interface ForecastJpaRepository extends JpaRepository<ForecastJpaEntity, 
 
     @Query(value = """
             SELECT DISTINCT ON (horizon_min) *
-            FROM public.forecasts
+            FROM prediction.forecasts
             WHERE lot_id = :parkingLotId
             ORDER BY horizon_min, generated_at DESC
             """, nativeQuery = true)
@@ -46,7 +46,7 @@ public interface ForecastJpaRepository extends JpaRepository<ForecastJpaEntity, 
     @Query(value = """
             SELECT COUNT(abs_error) AS "evaluatedForecasts",
                    AVG(abs_error) AS "meanAbsoluteErrorPct"
-            FROM public.forecasts
+            FROM prediction.forecasts
             WHERE lot_id = :parkingLotId
               AND abs_error IS NOT NULL
             """, nativeQuery = true)

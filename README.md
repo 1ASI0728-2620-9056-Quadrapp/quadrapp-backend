@@ -33,11 +33,13 @@ Each bounded context owns a PostgreSQL schema, with no foreign keys between sche
 | IAM | `iam` | `src/main/resources/db/migration/iam` |
 | Parking Configuration | `configuration` | `src/main/resources/db/migration/configuration` |
 | Parking Sensing | `sensing` | `src/main/resources/db/migration/sensing` |
+| Occupancy | `occupancy` | `src/main/resources/db/migration/occupancy` |
+| Prediction | `prediction` | `src/main/resources/db/migration/prediction` |
 
 - Tables are created only by Flyway. Every module runs its own migration and keeps its own `flyway_schema_history` inside its schema (`ModuleSchemaMigrations`).
 - Hibernate runs with `ddl-auto=validate`: it checks the JPA mappings against the migrated schema and never changes it.
 - To change a table, add a new file `V<n>__<description>.sql` to the module's folder. Never edit a migration that was already applied.
-- Each JPA entity declares its module schema in `@Table(schema = "...")`.
+- Each JPA entity declares its module schema in `@Table(schema = "...")`, and native SQL names the schema of every table it uses, because Hibernate validation does not check native queries.
 - Upgrade path: a database created before module schemas keeps its tables in `public`. On startup they are moved, with their data, into the module schema and Flyway baselines it at version 1. If only some of a module's tables exist in `public`, or they exist in both schemas, the application refuses to start and names the tables.
 - A new module adds its schema folder and a `FlywayMigrationInitializer` bean built with `ModuleSchemaMigrations.forSchema(...)`.
 

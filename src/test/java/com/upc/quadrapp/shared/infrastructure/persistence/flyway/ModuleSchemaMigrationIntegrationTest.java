@@ -20,7 +20,9 @@ class ModuleSchemaMigrationIntegrationTest {
     private static final Map<String, List<String>> MODULE_TABLES = Map.of(
             "iam", List.of("institution_domains", "institutions", "refresh_tokens", "users"),
             "configuration", List.of("accesses", "calendar_events", "levels", "parking_lots", "spaces", "zones"),
-            "sensing", List.of("device_incidents", "devices"));
+            "sensing", List.of("device_incidents", "devices"),
+            "occupancy", List.of("occupancy_snapshots", "sensor_events"),
+            "prediction", List.of("forecasts"));
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
