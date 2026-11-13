@@ -33,6 +33,12 @@ public class SpacePersistenceAdapter
     }
 
     @Override
+    public Optional<Space> findByIdForOccupancyUpdate(Long id) {
+        return repository.findByIdForOccupancyUpdate(id)
+                .map(mapper::toDomain);
+    }
+
+    @Override
     public List<Space> findByLevelId(Long levelId) {
         return repository.findByLevelId(levelId)
                 .stream()

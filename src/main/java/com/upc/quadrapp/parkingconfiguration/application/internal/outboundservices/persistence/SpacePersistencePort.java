@@ -11,6 +11,8 @@ public interface SpacePersistencePort {
 
     Optional<Space> findById(Long id);
 
+    Optional<Space> findByIdForOccupancyUpdate(Long id);
+
     List<Space> findByLevelId(Long levelId);
 
     boolean existsByLevelIdAndLabel(
