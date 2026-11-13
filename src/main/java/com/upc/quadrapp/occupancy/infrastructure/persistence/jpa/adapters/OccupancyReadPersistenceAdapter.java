@@ -7,6 +7,7 @@ import com.upc.quadrapp.occupancy.infrastructure.persistence.jpa.repositories.Oc
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
+import java.util.List;
 
 @Repository
 public class OccupancyReadPersistenceAdapter implements OccupancyReadPersistencePort {
@@ -36,5 +37,10 @@ public class OccupancyReadPersistenceAdapter implements OccupancyReadPersistence
     @Override
     public Optional<Long> findParkingLotIdForLevel(Long levelId) {
         return repository.findParkingLotIdForLevel(levelId);
+    }
+
+    @Override
+    public List<Long> findZoneIdsForParkingLot(Long parkingLotId) {
+        return repository.findZoneIdsForParkingLot(parkingLotId);
     }
 }

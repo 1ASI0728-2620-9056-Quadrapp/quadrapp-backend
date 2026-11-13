@@ -15,4 +15,12 @@ public interface OccupancyQueryService {
     OccupancySummary getByLevel(Long levelId);
 
     List<OccupancySnapshot> getSnapshots(Long zoneId, Instant from, Instant to);
+
+    List<OccupancySnapshot> getSnapshotsByParkingLot(
+            Long parkingLotId,
+            Instant from,
+            Instant to
+    );
+
+    OccupancySummary getByParkingLotForInternalUse(Long parkingLotId);
 }

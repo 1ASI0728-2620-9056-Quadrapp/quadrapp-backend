@@ -4,6 +4,7 @@ import com.upc.quadrapp.occupancy.domain.model.valueobjects.OccupancyCounts;
 import com.upc.quadrapp.occupancy.domain.model.valueobjects.OccupancyScopeType;
 
 import java.util.Optional;
+import java.util.List;
 
 public interface OccupancyReadPersistencePort {
 
@@ -12,4 +13,6 @@ public interface OccupancyReadPersistencePort {
     Optional<Long> findParkingLotIdForZone(Long zoneId);
 
     Optional<Long> findParkingLotIdForLevel(Long levelId);
+
+    List<Long> findZoneIdsForParkingLot(Long parkingLotId);
 }

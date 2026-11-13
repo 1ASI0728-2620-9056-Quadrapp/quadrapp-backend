@@ -6,6 +6,7 @@ import com.upc.quadrapp.occupancy.application.internal.outboundservices.persiste
 import com.upc.quadrapp.occupancy.application.internal.outboundservices.persistence.SensorEventPersistencePort;
 import com.upc.quadrapp.occupancy.domain.model.aggregates.OccupancySnapshot;
 import com.upc.quadrapp.occupancy.domain.model.commands.CreateOccupancySnapshotCommand;
+import com.upc.quadrapp.occupancy.domain.model.commands.CreateParkingLotSnapshotCommand;
 import com.upc.quadrapp.occupancy.domain.model.commands.RecordSensorEventCommand;
 import com.upc.quadrapp.occupancy.domain.model.entities.SensorEvent;
 import com.upc.quadrapp.occupancy.domain.model.exceptions.OccupancyNotFoundException;
@@ -119,5 +120,29 @@ public class OccupancyCommandServiceImpl implements OccupancyCommandService {
         );
 
         return snapshots.save(snapshot);
+    }
+
+    @Override
+    @Transactional
+    public java.util.List<OccupancySnapshot> handle(
+            CreateParkingLotSnapshotCommand command
+    ) {
+        Long institutionId = iam.getCurrentUser().institutionId();
+        if (parkingConfigurationContext
+                .findParkingLot(institutionId, command.parkingLotId())
+                .isEmpty()) {
+            throw new OccupancyNotFoundException("Parking lot not found.");
+        }
+
+        java.time.Instant takenAt = clock.instant();
+        return occupancyRead.findZoneIdsForParkingLot(command.parkingLotId())
+                .stream()
+                .map(zoneId -> OccupancySnapshot.create(
+                        zoneId,
+                        takenAt,
+                        occupancyRead.summarize(OccupancyScopeType.ZONE, zoneId)
+                ))
+                .map(snapshots::save)
+                .toList();
     }
 }

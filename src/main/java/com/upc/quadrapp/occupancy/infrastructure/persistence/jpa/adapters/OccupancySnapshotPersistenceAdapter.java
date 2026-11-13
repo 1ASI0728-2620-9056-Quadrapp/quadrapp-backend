@@ -56,6 +56,26 @@ public class OccupancySnapshotPersistenceAdapter implements OccupancySnapshotPer
                 .toList();
     }
 
+    @Override
+    public List<OccupancySnapshot> findByParkingLotId(Long parkingLotId) {
+        return repository.findByParkingLotId(parkingLotId)
+                .stream()
+                .map(OccupancySnapshotPersistenceAdapter::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<OccupancySnapshot> findByParkingLotIdAndTakenAtBetween(
+            Long parkingLotId,
+            Instant from,
+            Instant to
+    ) {
+        return repository.findByParkingLotIdAndTakenAtBetween(parkingLotId, from, to)
+                .stream()
+                .map(OccupancySnapshotPersistenceAdapter::toDomain)
+                .toList();
+    }
+
     private static OccupancySnapshot toDomain(OccupancySnapshotJpaEntity entity) {
         return new OccupancySnapshot(
                 entity.getId(),

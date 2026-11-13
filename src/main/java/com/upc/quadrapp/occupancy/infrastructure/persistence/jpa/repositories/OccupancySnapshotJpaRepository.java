@@ -20,6 +20,32 @@ public interface OccupancySnapshotJpaRepository
     );
 
     @Query(value = """
+            SELECT snapshot.*
+            FROM public.occupancy_snapshots snapshot
+            JOIN public.zones zone ON zone.id = snapshot.zone_id
+            WHERE zone.lot_id = :parkingLotId
+            ORDER BY snapshot.taken_at ASC, snapshot.zone_id ASC
+            """, nativeQuery = true)
+    List<OccupancySnapshotJpaEntity> findByParkingLotId(
+            @Param("parkingLotId") Long parkingLotId
+    );
+
+    @Query(value = """
+            SELECT snapshot.*
+            FROM public.occupancy_snapshots snapshot
+            JOIN public.zones zone ON zone.id = snapshot.zone_id
+            WHERE zone.lot_id = :parkingLotId
+              AND snapshot.taken_at >= :from
+              AND snapshot.taken_at <= :to
+            ORDER BY snapshot.taken_at ASC, snapshot.zone_id ASC
+            """, nativeQuery = true)
+    List<OccupancySnapshotJpaEntity> findByParkingLotIdAndTakenAtBetween(
+            @Param("parkingLotId") Long parkingLotId,
+            @Param("from") java.time.Instant from,
+            @Param("to") java.time.Instant to
+    );
+
+    @Query(value = """
             SELECT COUNT(*) AS "totalSpaces",
                    COUNT(*) FILTER (WHERE s.status = 'FREE') AS "freeCount",
                    COUNT(*) FILTER (WHERE s.status = 'OCCUPIED') AS "occupiedCount",
@@ -53,6 +79,14 @@ public interface OccupancySnapshotJpaRepository
             WHERE l.id = :levelId
             """, nativeQuery = true)
     Optional<Long> findParkingLotIdForLevel(@Param("levelId") Long levelId);
+
+    @Query(value = """
+            SELECT z.id
+            FROM public.zones z
+            WHERE z.lot_id = :parkingLotId
+            ORDER BY z.id
+            """, nativeQuery = true)
+    List<Long> findZoneIdsForParkingLot(@Param("parkingLotId") Long parkingLotId);
 
     interface OccupancyCountsProjection {
         Long getTotalSpaces();

@@ -66,21 +66,30 @@ public class OccupancyQueryServiceImpl implements OccupancyQueryService {
         Long parkingLotId = occupancyRead.findParkingLotIdForZone(zoneId)
                 .orElseThrow(() -> new OccupancyNotFoundException("Zone not found."));
         requireAuthorizedParkingLot(parkingLotId);
-
-        if ((from == null) != (to == null)) {
-            throw new IllegalArgumentException(
-                    "Both from and to timestamps must be provided together."
-            );
-        }
-        if (from != null && from.isAfter(to)) {
-            throw new IllegalArgumentException(
-                    "The from timestamp must not be after to."
-            );
-        }
+        validateRange(from, to);
 
         return from == null
                 ? snapshots.findByZoneId(zoneId)
                 : snapshots.findByZoneIdAndTakenAtBetween(zoneId, from, to);
+    }
+
+    @Override
+    public List<OccupancySnapshot> getSnapshotsByParkingLot(
+            Long parkingLotId,
+            Instant from,
+            Instant to
+    ) {
+        requireAuthorizedParkingLot(parkingLotId);
+        validateRange(from, to);
+
+        return from == null
+                ? snapshots.findByParkingLotId(parkingLotId)
+                : snapshots.findByParkingLotIdAndTakenAtBetween(parkingLotId, from, to);
+    }
+
+    @Override
+    public OccupancySummary getByParkingLotForInternalUse(Long parkingLotId) {
+        return summary(OccupancyScopeType.PARKING_LOT, parkingLotId);
     }
 
     private OccupancySummary summary(OccupancyScopeType scopeType, Long scopeId) {
@@ -96,6 +105,19 @@ public class OccupancyQueryServiceImpl implements OccupancyQueryService {
         Long institutionId = iam.getCurrentUser().institutionId();
         if (parkingConfiguration.findParkingLot(institutionId, parkingLotId).isEmpty()) {
             throw new OccupancyNotFoundException("Parking lot not found.");
+        }
+    }
+
+    private static void validateRange(Instant from, Instant to) {
+        if ((from == null) != (to == null)) {
+            throw new IllegalArgumentException(
+                    "Both from and to timestamps must be provided together."
+            );
+        }
+        if (from != null && from.isAfter(to)) {
+            throw new IllegalArgumentException(
+                    "The from timestamp must not be after to."
+            );
         }
     }
 }

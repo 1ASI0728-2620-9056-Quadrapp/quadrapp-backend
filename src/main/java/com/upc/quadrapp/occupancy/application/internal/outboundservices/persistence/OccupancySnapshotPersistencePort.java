@@ -16,4 +16,12 @@ public interface OccupancySnapshotPersistencePort {
             Instant from,
             Instant to
     );
+
+    List<OccupancySnapshot> findByParkingLotId(Long parkingLotId);
+
+    List<OccupancySnapshot> findByParkingLotIdAndTakenAtBetween(
+            Long parkingLotId,
+            Instant from,
+            Instant to
+    );
 }

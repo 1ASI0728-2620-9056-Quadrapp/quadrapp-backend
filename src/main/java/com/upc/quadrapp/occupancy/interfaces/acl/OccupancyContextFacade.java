@@ -1,6 +1,7 @@
 package com.upc.quadrapp.occupancy.interfaces.acl;
 
 import com.upc.quadrapp.occupancy.domain.model.commands.RecordSensorEventCommand;
+import com.upc.quadrapp.occupancy.domain.model.commands.CreateParkingLotSnapshotCommand;
 import com.upc.quadrapp.occupancy.domain.model.aggregates.OccupancySnapshot;
 import com.upc.quadrapp.occupancy.domain.model.valueobjects.OccupancyEventType;
 import com.upc.quadrapp.occupancy.domain.model.valueobjects.OccupancySummary;
@@ -92,6 +93,28 @@ public class OccupancyContextFacade {
                 .stream()
                 .map(OccupancySnapshotView::from)
                 .toList();
+    }
+
+    public List<OccupancySnapshotView> captureSnapshotsByParkingLot(Long parkingLotId) {
+        return commands.handle(new CreateParkingLotSnapshotCommand(parkingLotId))
+                .stream()
+                .map(OccupancySnapshotView::from)
+                .toList();
+    }
+
+    public List<OccupancySnapshotView> snapshotsByParkingLot(
+            Long parkingLotId,
+            Instant from,
+            Instant to
+    ) {
+        return queries.getSnapshotsByParkingLot(parkingLotId, from, to)
+                .stream()
+                .map(OccupancySnapshotView::from)
+                .toList();
+    }
+
+    public OccupancyView currentOccupancyForInternalUse(Long parkingLotId) {
+        return OccupancyView.from(queries.getByParkingLotForInternalUse(parkingLotId));
     }
 
     public record OccupancyView(
