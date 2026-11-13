@@ -129,6 +129,44 @@ public final class Space {
         );
     }
 
+    public Space applyOccupancyDetection(
+            SpaceStatus newStatus,
+            Instant occurredAt,
+            Instant receivedAt
+    ) {
+        Objects.requireNonNull(newStatus);
+        Objects.requireNonNull(occurredAt);
+        Objects.requireNonNull(receivedAt);
+
+        if (newStatus == SpaceStatus.UNKNOWN) {
+            throw new IllegalArgumentException(
+                    "Sensor detections cannot set a space to UNKNOWN."
+            );
+        }
+
+        if (lastEventAt != null && !occurredAt.isAfter(lastEventAt)) {
+            return this;
+        }
+
+        boolean statusChanged = status != newStatus;
+
+        return new Space(
+                id,
+                levelId,
+                label,
+                type,
+                posX,
+                posY,
+                newStatus,
+                null,
+                statusChanged ? occurredAt : statusSince,
+                occurredAt,
+                active,
+                createdAt,
+                receivedAt
+        );
+    }
+
     public Long getId() {
         return id;
     }
