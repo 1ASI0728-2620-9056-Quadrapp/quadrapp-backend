@@ -9,7 +9,9 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
 
 class SensingEventListenerTest {
@@ -49,5 +51,21 @@ class SensingEventListenerTest {
 
         verify(commands).handle(new RecordSensorEventCommand(
                 10L, 20L, 41L, null, 50L, "evt-4", OccupancyEventType.EXIT, DETECTED_AT));
+    }
+
+    @Test
+    void anEventWithoutStateIsRejectedInsteadOfFreeingTheSpace() {
+        assertThatThrownBy(() -> listener.on(new SensorStateChanged("evt-5", 40L, 10L, 20L, 30L, null, DETECTED_AT)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Sensor state is required.");
+        verifyNoInteractions(commands);
+    }
+
+    @Test
+    void aPassageWithoutDirectionIsRejectedInsteadOfCountingAnExit() {
+        assertThatThrownBy(() -> listener.on(new VehiclePassageDetected("evt-6", 41L, 10L, 20L, 50L, null, DETECTED_AT)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Passage direction is required.");
+        verifyNoInteractions(commands);
     }
 }
