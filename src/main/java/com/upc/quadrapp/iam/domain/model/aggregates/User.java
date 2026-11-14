@@ -1,5 +1,6 @@
 package com.upc.quadrapp.iam.domain.model.aggregates;
 
+import com.upc.quadrapp.iam.domain.model.exceptions.IamConflictException;
 import com.upc.quadrapp.iam.domain.model.valueobjects.EmailAddress;
 import com.upc.quadrapp.iam.domain.model.valueobjects.NotificationPreferences;
 import com.upc.quadrapp.iam.domain.model.valueobjects.Roles;
@@ -245,7 +246,7 @@ public class User {
 
         if (status != UserStatus.INVITED ||
                 !Objects.equals(this.institutionId, institutionId)) {
-            throw new IllegalStateException(
+            throw new IamConflictException(
                     "Email is already registered."
             );
         }
@@ -278,14 +279,14 @@ public class User {
         Objects.requireNonNull(now, "Timestamp is required.");
 
         if (status != UserStatus.INVITED) {
-            throw new IllegalStateException(
+            throw new IamConflictException(
                     "User has no pending invitation."
             );
         }
 
         if (invitationExpiresAt == null ||
                 !now.isBefore(invitationExpiresAt)) {
-            throw new IllegalStateException(
+            throw new IamConflictException(
                     "Invitation has expired."
             );
         }
@@ -321,7 +322,7 @@ public class User {
         Objects.requireNonNull(now, "Timestamp is required.");
 
         if (status != UserStatus.ACTIVE) {
-            throw new IllegalStateException(
+            throw new IamConflictException(
                     "User account is not active."
             );
         }
@@ -353,7 +354,7 @@ public class User {
         }
 
         if (status != UserStatus.ACTIVE) {
-            throw new IllegalStateException(
+            throw new IamConflictException(
                     "Only active users can change roles."
             );
         }
@@ -366,7 +367,7 @@ public class User {
         Objects.requireNonNull(now, "Timestamp is required.");
 
         if (status == UserStatus.DISABLED) {
-            throw new IllegalStateException(
+            throw new IamConflictException(
                     "User is already disabled."
             );
         }
@@ -379,13 +380,13 @@ public class User {
         Objects.requireNonNull(now, "Timestamp is required.");
 
         if (status != UserStatus.DISABLED) {
-            throw new IllegalStateException(
+            throw new IamConflictException(
                     "Only disabled users can be reactivated."
             );
         }
 
         if (verifiedAt == null) {
-            throw new IllegalStateException(
+            throw new IamConflictException(
                     "Unverified users cannot be reactivated directly."
             );
         }

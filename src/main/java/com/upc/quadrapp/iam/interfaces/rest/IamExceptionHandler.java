@@ -1,6 +1,9 @@
 package com.upc.quadrapp.iam.interfaces.rest;
 
+import com.upc.quadrapp.iam.domain.model.exceptions.IamConflictException;
 import com.upc.quadrapp.iam.domain.model.exceptions.OtpRequestLimitExceededException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +23,8 @@ import java.util.Map;
 @RestControllerAdvice(basePackages = "com.upc.quadrapp.iam.interfaces.rest")
 public class IamExceptionHandler {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(IamExceptionHandler.class);
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleInvalidArgument(
             IllegalArgumentException exception
@@ -30,13 +35,28 @@ public class IamExceptionHandler {
         );
     }
 
-    @ExceptionHandler(IllegalStateException.class)
-    public ResponseEntity<Map<String, Object>> handleInvalidState(
-            IllegalStateException exception
+    @ExceptionHandler(IamConflictException.class)
+    public ResponseEntity<Map<String, Object>> handleConflict(
+            IamConflictException exception
     ) {
         return response(
                 HttpStatus.CONFLICT,
                 exception.getMessage()
+        );
+    }
+
+    /**
+     * Any other invalid state is a server fault (configuration, hashing, an unexpected framework
+     * state): it is logged and answered with a generic message, never as a client conflict.
+     */
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<Map<String, Object>> handleInvalidState(
+            IllegalStateException exception
+    ) {
+        LOGGER.error("Unexpected IAM state error", exception);
+        return response(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "An unexpected error occurred."
         );
     }
 

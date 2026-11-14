@@ -1,5 +1,6 @@
 package com.upc.quadrapp.iam.application.internal.commandservices;
 
+import com.upc.quadrapp.iam.domain.model.exceptions.IamConflictException;
 import com.upc.quadrapp.iam.application.internal.outboundservices.persistence.InstitutionDomainPersistencePort;
 import com.upc.quadrapp.iam.application.internal.outboundservices.persistence.InstitutionPersistencePort;
 import com.upc.quadrapp.iam.domain.model.aggregates.Institution;
@@ -42,7 +43,7 @@ public class InstitutionCommandServiceImpl
         if (institutionPersistencePort.existsByName(
                 institution.getName()
         )) {
-            throw new IllegalStateException(
+            throw new IamConflictException(
                     "Institution name is already registered."
             );
         }
@@ -71,7 +72,7 @@ public class InstitutionCommandServiceImpl
                 ));
 
         if (!institution.isActive()) {
-            throw new IllegalStateException(
+            throw new IamConflictException(
                     "Institution is not active."
             );
         }
@@ -84,7 +85,7 @@ public class InstitutionCommandServiceImpl
                 || institutionDomainPersistencePort
                 .findVerifiedByDomain(domainName.value())
                 .isPresent()) {
-            throw new IllegalStateException(
+            throw new IamConflictException(
                     "Institution domain is already registered."
             );
         }
@@ -126,7 +127,7 @@ public class InstitutionCommandServiceImpl
                 ));
 
         if (!institution.isActive()) {
-            throw new IllegalStateException(
+            throw new IamConflictException(
                     "Cannot verify a domain of an inactive institution."
             );
         }
@@ -137,7 +138,7 @@ public class InstitutionCommandServiceImpl
                 .isPresent();
 
         if (verifiedElsewhere) {
-            throw new IllegalStateException(
+            throw new IamConflictException(
                     "Institution domain is already verified by another institution."
             );
         }

@@ -1,5 +1,6 @@
 package com.upc.quadrapp.iam.domain.model.aggregates;
 
+import com.upc.quadrapp.iam.domain.model.exceptions.IamConflictException;
 import lombok.Getter;
 
 import java.time.Instant;
@@ -74,7 +75,7 @@ public class Institution {
         Objects.requireNonNull(now, "Timestamp is required.");
 
         if (active) {
-            throw new IllegalStateException(
+            throw new IamConflictException(
                     "Institution is already active."
             );
         }
@@ -87,7 +88,7 @@ public class Institution {
         Objects.requireNonNull(now, "Timestamp is required.");
 
         if (!active) {
-            throw new IllegalStateException(
+            throw new IamConflictException(
                     "Institution is already inactive."
             );
         }

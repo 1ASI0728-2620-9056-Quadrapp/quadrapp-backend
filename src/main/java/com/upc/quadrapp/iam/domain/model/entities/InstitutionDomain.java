@@ -1,5 +1,6 @@
 package com.upc.quadrapp.iam.domain.model.entities;
 
+import com.upc.quadrapp.iam.domain.model.exceptions.IamConflictException;
 import com.upc.quadrapp.iam.domain.model.valueobjects.EmailAddress;
 import com.upc.quadrapp.iam.domain.model.valueobjects.InstitutionDomainName;
 
@@ -84,7 +85,7 @@ public class InstitutionDomain {
         Objects.requireNonNull(now, "Timestamp is required.");
 
         if (isVerified()) {
-            throw new IllegalStateException(
+            throw new IamConflictException(
                     "Institution domain is already verified."
             );
         }

@@ -1,5 +1,6 @@
 package com.upc.quadrapp.iam.application.internal.commandservices;
 
+import com.upc.quadrapp.iam.domain.model.exceptions.IamConflictException;
 import com.upc.quadrapp.iam.application.internal.outboundservices.hashing.TokenHashingService;
 import com.upc.quadrapp.iam.application.internal.outboundservices.mail.InvitationDeliveryService;
 import com.upc.quadrapp.iam.application.internal.outboundservices.persistence.InstitutionDomainPersistencePort;
@@ -65,7 +66,7 @@ public class UserCommandServiceImpl implements UserCommandService {
                 ));
 
         if (!institution.isActive()) {
-            throw new IllegalStateException(
+            throw new IamConflictException(
                     "Institution is not active."
             );
         }
@@ -76,7 +77,7 @@ public class UserCommandServiceImpl implements UserCommandService {
 
         if (pendingUser.isPresent() &&
                 pendingUser.get().getStatus() != UserStatus.INVITED) {
-            throw new IllegalStateException(
+            throw new IamConflictException(
                     "Email is already registered."
             );
         }
@@ -177,7 +178,7 @@ public class UserCommandServiceImpl implements UserCommandService {
                 ));
 
         if (!institution.isActive()) {
-            throw new IllegalStateException(
+            throw new IamConflictException(
                     "Institution is not active."
             );
         }
@@ -187,7 +188,7 @@ public class UserCommandServiceImpl implements UserCommandService {
 
         if (institutionalDomain.isEmpty() &&
                 !institutionDomainPersistencePort.existsByDomain(user.getEmail().domain())) {
-            throw new IllegalStateException(
+            throw new IamConflictException(
                     "Institutional domain was not found."
             );
         }
@@ -195,7 +196,7 @@ public class UserCommandServiceImpl implements UserCommandService {
         if (institutionalDomain.isEmpty() ||
                 !institutionalDomain.get().getInstitutionId()
                         .equals(user.getInstitutionId())) {
-            throw new IllegalStateException(
+            throw new IamConflictException(
                     "Institutional domain is not verified."
             );
         }
@@ -226,7 +227,7 @@ public class UserCommandServiceImpl implements UserCommandService {
                 ));
 
         if (user.getStatus() != UserStatus.ACTIVE) {
-            throw new IllegalStateException(
+            throw new IamConflictException(
                     "User is not active."
             );
         }

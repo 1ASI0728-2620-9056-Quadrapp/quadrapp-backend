@@ -1,5 +1,6 @@
 package com.upc.quadrapp.iam.domain.model.entities;
 
+import com.upc.quadrapp.iam.domain.model.exceptions.IamConflictException;
 import lombok.Getter;
 
 import java.time.Instant;
@@ -115,7 +116,7 @@ public class RefreshToken {
         Objects.requireNonNull(now, "Timestamp is required.");
 
         if (revokedAt != null) {
-            throw new IllegalStateException(
+            throw new IamConflictException(
                     "Refresh token has already been revoked."
             );
         }
