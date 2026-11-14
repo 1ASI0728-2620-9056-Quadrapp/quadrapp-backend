@@ -16,8 +16,11 @@ public class SharedSchemaMigrationConfiguration {
 
     public static final String SCHEMA = "shared";
 
-    /** Tables created by this schema's migrations. */
-    public static final List<String> TABLES = List.of("event_publication", "shedlock");
+    /**
+     * Legacy tables to adopt from {@code public}: none, because this schema was created by its
+     * own migrations from the start (event_publication in V1, shedlock in V2).
+     */
+    public static final List<String> TABLES = List.of();
 
     @Bean
     public FlywayMigrationInitializer sharedSchemaMigration(DataSource dataSource) {

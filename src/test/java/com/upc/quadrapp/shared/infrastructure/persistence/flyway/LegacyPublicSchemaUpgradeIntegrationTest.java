@@ -12,9 +12,16 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
@@ -86,6 +93,79 @@ class LegacyPublicSchemaUpgradeIntegrationTest {
         assertThat(foreignKeysWithin(SCHEMA)).containsExactlyInAnyOrder(
                 "fk_institution_domains_institution", "fk_institution_domains_verifier",
                 "fk_refresh_tokens_user", "fk_users_institution", "fk_users_inviter");
+    }
+
+    @Test
+    void theSharedSchemaHasNoLegacyTablesToAdopt() throws Exception {
+        jdbcTemplate.execute("drop schema if exists " + SharedSchemaMigrationConfiguration.SCHEMA + " cascade");
+        jdbcTemplate.execute("create table public.event_publication (id uuid primary key)");
+
+        ModuleSchemaMigrations.forSchema(dataSource, SharedSchemaMigrationConfiguration.SCHEMA,
+                SharedSchemaMigrationConfiguration.TABLES).afterPropertiesSet();
+
+        assertThat(tablesIn("shared")).contains("event_publication", "shedlock");
+        assertThat(tablesIn("public")).containsExactly("event_publication");
+    }
+
+    @Test
+    void twoReplicasStartingTogetherOnALegacyDatabaseBothSucceed() throws Exception {
+        createLegacyIamTablesInPublic();
+        jdbcTemplate.update("insert into public.institutions (name) values ('UPC')");
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService replicas = Executors.newFixedThreadPool(2);
+        try {
+            List<Future<?>> startups = new ArrayList<>();
+            for (int replica = 0; replica < 2; replica++) {
+                startups.add(replicas.submit(() -> {
+                    start.await();
+                    ModuleSchemaMigrations.forSchema(dataSource, SCHEMA, TABLES).afterPropertiesSet();
+                    return null;
+                }));
+            }
+            start.countDown();
+            for (Future<?> startup : startups) {
+                startup.get(60, TimeUnit.SECONDS);
+            }
+        } finally {
+            replicas.shutdownNow();
+        }
+
+        assertThat(jdbcTemplate.queryForList("select name from iam.institutions", String.class)).containsExactly("UPC");
+        assertThat(tablesIn("public")).isEmpty();
+    }
+
+    @Test
+    void legacyTablesOwnedByAnotherRoleAreNotHiddenBehindNewEmptyTables() throws Exception {
+        createLegacyIamTablesInPublic();
+        String database = jdbcTemplate.queryForObject("select current_database()", String.class);
+        dropLimitedRole();
+        jdbcTemplate.execute("create role limited_app login password 'limited'");
+        jdbcTemplate.execute("grant create on database " + database + " to limited_app");
+        PGSimpleDataSource limited = new PGSimpleDataSource();
+        limited.setUrl(POSTGRES.getJdbcUrl());
+        limited.setUser("limited_app");
+        limited.setPassword("limited");
+        try {
+            assertThatThrownBy(() -> ModuleSchemaMigrations.forSchema(limited, SCHEMA, TABLES).afterPropertiesSet())
+                    .isInstanceOf(IllegalStateException.class);
+            assertThat(tablesIn(SCHEMA)).isEmpty();
+        } finally {
+            jdbcTemplate.execute("drop schema if exists " + SCHEMA + " cascade");
+            dropLimitedRole();
+        }
+    }
+
+    private void dropLimitedRole() {
+        jdbcTemplate.execute("do $$ begin if exists (select from pg_roles where rolname = 'limited_app') then "
+                + "execute 'drop owned by limited_app cascade'; execute 'drop role limited_app'; end if; end $$");
+    }
+
+    @Test
+    void identifiersMayContainDigitsButNotStartWithOne() {
+        assertThatCode(() -> ModuleSchemaMigrations.forSchema(dataSource, "module2", List.of("readings_v2")))
+                .doesNotThrowAnyException();
+        assertThatThrownBy(() -> ModuleSchemaMigrations.forSchema(dataSource, "2module", List.of("readings")))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

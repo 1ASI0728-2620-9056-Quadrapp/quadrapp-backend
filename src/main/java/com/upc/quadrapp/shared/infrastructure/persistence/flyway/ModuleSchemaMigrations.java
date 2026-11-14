@@ -40,7 +40,9 @@ import java.util.regex.Pattern;
 public final class ModuleSchemaMigrations {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ModuleSchemaMigrations.class);
-    private static final Pattern IDENTIFIER = Pattern.compile("[a-z_]+");
+    private static final Pattern IDENTIFIER = Pattern.compile("[a-z_][a-z0-9_]*");
+    /** Key of the PostgreSQL advisory lock that serializes the upgrade steps across replicas. */
+    private static final long UPGRADE_LOCK_KEY = 7_401_288_311L;
     private static final String LEGACY_SCHEMA = "public";
 
     private ModuleSchemaMigrations() {
@@ -59,8 +61,13 @@ public final class ModuleSchemaMigrations {
                 .baselineDescription("adopt tables moved from the public schema")
                 .load();
         return new FlywayMigrationInitializer(flyway, migration -> {
-            adoptLegacyTables(dataSource, schema, tables);
-            dropCrossSchemaForeignKeys(dataSource, schema);
+            // Replicas that start together on a legacy database would race on moving the same
+            // tables, so the upgrade steps run under one database-wide lock. Flyway locks its own
+            // migration run.
+            withUpgradeLock(dataSource, () -> {
+                adoptLegacyTables(dataSource, schema, tables);
+                dropCrossSchemaForeignKeys(dataSource, schema);
+            });
             migration.migrate();
         });
     }
@@ -117,10 +124,34 @@ public final class ModuleSchemaMigrations {
         }
     }
 
+    private static void withUpgradeLock(DataSource dataSource, Runnable steps) {
+        try (Connection connection = dataSource.getConnection()) {
+            try (PreparedStatement lock = connection.prepareStatement("select pg_advisory_lock(?)")) {
+                lock.setLong(1, UPGRADE_LOCK_KEY);
+                lock.execute();
+            }
+            try {
+                steps.run();
+            } finally {
+                try (PreparedStatement unlock = connection.prepareStatement("select pg_advisory_unlock(?)")) {
+                    unlock.setLong(1, UPGRADE_LOCK_KEY);
+                    unlock.execute();
+                }
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Could not take the module upgrade lock", exception);
+        }
+    }
+
+    /**
+     * Reads the catalog instead of {@code information_schema}, which only lists tables the current
+     * role has privileges on: a legacy table owned by another role must stop the startup, never be
+     * hidden behind a new empty table.
+     */
     private static Set<String> existingTables(Connection connection, String schema, List<String> tables)
             throws SQLException {
-        String query = "select table_name from information_schema.tables "
-                + "where table_schema = ? and table_type = 'BASE TABLE' and table_name = any (?)";
+        String query = "select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace "
+                + "where n.nspname = ? and c.relkind in ('r', 'p') and c.relname = any (?)";
         try (PreparedStatement statement = connection.prepareStatement(query)) {
             statement.setString(1, schema);
             statement.setArray(2, connection.createArrayOf("text", tables.toArray()));
@@ -152,7 +183,11 @@ public final class ModuleSchemaMigrations {
             }
             connection.commit();
         } catch (SQLException exception) {
-            connection.rollback();
+            try {
+                connection.rollback();
+            } catch (SQLException rollbackFailure) {
+                exception.addSuppressed(rollbackFailure);
+            }
             throw exception;
         } finally {
             connection.setAutoCommit(autoCommit);
