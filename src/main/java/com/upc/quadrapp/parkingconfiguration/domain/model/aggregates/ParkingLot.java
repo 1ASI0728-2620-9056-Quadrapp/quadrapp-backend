@@ -94,16 +94,15 @@ public final class ParkingLot {
             );
         }
 
-        if (saturationThresholdPct < 1 ||
-                saturationThresholdPct > 100 ||
-                lowBatteryThresholdPct < 1 ||
-                lowBatteryThresholdPct > 100 ||
-                accuracyMarginPct < 1 ||
-                accuracyMarginPct > 100 ||
+        // Ranges of OperatingSettings in the report: saturation 50-100 %, flow window 5-60 min,
+        // minimum detection time 3-60 s and accuracy margin 1-30 points.
+        if (outside(saturationThresholdPct, 50, 100) ||
+                outside(lowBatteryThresholdPct, 1, 100) ||
+                outside(accuracyMarginPct, 1, 30) ||
                 staleAfterSeconds <= 0 ||
-                flowWindowMinutes <= 0 ||
-                occupiedDebounceS <= 0 ||
-                freedDebounceS <= 0 ||
+                outside(flowWindowMinutes, 5, 60) ||
+                outside(occupiedDebounceS, 3, 60) ||
+                outside(freedDebounceS, 3, 60) ||
                 layoutVersion < 0) {
             throw new IllegalArgumentException(
                     "Invalid parking lot settings."
@@ -137,6 +136,10 @@ public final class ParkingLot {
 
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
+    }
+
+    private static boolean outside(int value, int min, int max) {
+        return value < min || value > max;
     }
 
     public static ParkingLot register(
