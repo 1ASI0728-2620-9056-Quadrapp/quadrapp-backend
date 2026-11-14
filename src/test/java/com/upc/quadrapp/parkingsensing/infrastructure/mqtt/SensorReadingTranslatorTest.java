@@ -25,8 +25,8 @@ class SensorReadingTranslatorTest {
     @Test
     void translatesASpaceReadingWithTheInstitutionAndGatewayOfTheTopic() {
         GatewayReading translated = translator.translate(TOPIC, bytes("""
-                {"eventId":"%s","hardwareId":"SN-0342","kind":"SPACE","state":"OCCUPIED",
-                 "readingAt":"2026-10-09T13:05:12.200Z","battery":82,"signal":-71}
+                {"eventId":"%s","sensorId":"SN-0342","kind":"SPACE","state":"OCCUPIED",
+                 "ts":"2026-10-09T13:05:12.200Z","battery":82,"rssi":-71}
                 """.formatted(EVENT_ID)));
 
         assertThat(translated.institutionId()).isEqualTo(7L);
@@ -37,8 +37,8 @@ class SensorReadingTranslatorTest {
     @Test
     void translatesAPassReadingWithoutOptionalFields() {
         GatewayReading translated = translator.translate(TOPIC, bytes("""
-                {"eventId":"%s","hardwareId":"PS-01","kind":"PASS","direction":"OUT",
-                 "readingAt":"2026-10-09T13:05:12Z"}
+                {"eventId":"%s","sensorId":"PS-01","kind":"PASS","direction":"OUT",
+                 "ts":"2026-10-09T13:05:12Z"}
                 """.formatted(EVENT_ID)));
 
         assertThat(translated.reading()).isEqualTo(new SensorReading(EVENT_ID, "PS-01", ReadingKind.PASS,
@@ -48,8 +48,8 @@ class SensorReadingTranslatorTest {
     @Test
     void translatesAHeartbeatAndTreatsNullOptionalFieldsAsAbsent() {
         GatewayReading translated = translator.translate(TOPIC, bytes("""
-                {"eventId":"%s","hardwareId":"GW-01","kind":"HEARTBEAT","readingAt":"2026-10-09T13:05:12Z",
-                 "battery":null,"signal":null}
+                {"eventId":"%s","sensorId":"GW-01","kind":"HEARTBEAT","ts":"2026-10-09T13:05:12Z",
+                 "battery":null,"rssi":null}
                 """.formatted(EVENT_ID)));
 
         assertThat(translated.reading()).isEqualTo(new SensorReading(EVENT_ID, "GW-01", ReadingKind.HEARTBEAT,
@@ -59,7 +59,7 @@ class SensorReadingTranslatorTest {
     @Test
     void takesTheGatewayFromTheTopicAndNeverFromThePayload() {
         GatewayReading translated = translator.translate(TOPIC, bytes("""
-                {"eventId":"%s","hardwareId":"SN-1","kind":"HEARTBEAT","readingAt":"2026-10-09T13:05:12Z",
+                {"eventId":"%s","sensorId":"SN-1","kind":"HEARTBEAT","ts":"2026-10-09T13:05:12Z",
                  "gatewayHardwareId":"GW-OTHER","gatewayId":"GW-OTHER"}
                 """.formatted(EVENT_ID)));
 
@@ -69,8 +69,8 @@ class SensorReadingTranslatorTest {
     @Test
     void normalizesTheEventIdToTheCanonicalLowerCaseUuid() {
         GatewayReading translated = translator.translate(TOPIC, bytes("""
-                {"eventId":"8F0D5C0E-3B1A-4D7E-9A35-2F8B1C7E4A10","hardwareId":"SN-1","kind":"HEARTBEAT",
-                 "readingAt":"2026-10-09T13:05:12Z"}
+                {"eventId":"8F0D5C0E-3B1A-4D7E-9A35-2F8B1C7E4A10","sensorId":"SN-1","kind":"HEARTBEAT",
+                 "ts":"2026-10-09T13:05:12Z"}
                 """));
 
         assertThat(translated.reading().eventId()).isEqualTo(EVENT_ID);
@@ -91,7 +91,7 @@ class SensorReadingTranslatorTest {
     })
     void rejectsATopicOutsideTheReadingsContract(String topic) {
         byte[] valid = bytes("""
-                {"eventId":"%s","hardwareId":"SN-1","kind":"HEARTBEAT","readingAt":"2026-10-09T13:05:12Z"}
+                {"eventId":"%s","sensorId":"SN-1","kind":"HEARTBEAT","ts":"2026-10-09T13:05:12Z"}
                 """.formatted(EVENT_ID));
 
         assertThatThrownBy(() -> translator.translate(topic, valid))
@@ -103,24 +103,24 @@ class SensorReadingTranslatorTest {
             not json                  | {
             not an object             | ["SPACE"]
             empty payload             | ''
-            missing eventId           | {"hardwareId":"SN-1","kind":"HEARTBEAT","readingAt":"2026-10-09T13:05:12Z"}
-            eventId not a UUID        | {"eventId":"evt-1","hardwareId":"SN-1","kind":"HEARTBEAT","readingAt":"2026-10-09T13:05:12Z"}
-            eventId not a string      | {"eventId":12,"hardwareId":"SN-1","kind":"HEARTBEAT","readingAt":"2026-10-09T13:05:12Z"}
-            missing hardwareId        | {"eventId":"8f0d5c0e-3b1a-4d7e-9a35-2f8b1c7e4a10","kind":"HEARTBEAT","readingAt":"2026-10-09T13:05:12Z"}
-            blank hardwareId          | {"eventId":"8f0d5c0e-3b1a-4d7e-9a35-2f8b1c7e4a10","hardwareId":" ","kind":"HEARTBEAT","readingAt":"2026-10-09T13:05:12Z"}
-            missing kind              | {"eventId":"8f0d5c0e-3b1a-4d7e-9a35-2f8b1c7e4a10","hardwareId":"SN-1","readingAt":"2026-10-09T13:05:12Z"}
-            unknown kind              | {"eventId":"8f0d5c0e-3b1a-4d7e-9a35-2f8b1c7e4a10","hardwareId":"SN-1","kind":"DOOR","readingAt":"2026-10-09T13:05:12Z"}
-            SPACE without state       | {"eventId":"8f0d5c0e-3b1a-4d7e-9a35-2f8b1c7e4a10","hardwareId":"SN-1","kind":"SPACE","readingAt":"2026-10-09T13:05:12Z"}
-            unknown state             | {"eventId":"8f0d5c0e-3b1a-4d7e-9a35-2f8b1c7e4a10","hardwareId":"SN-1","kind":"SPACE","state":"BUSY","readingAt":"2026-10-09T13:05:12Z"}
-            PASS with state           | {"eventId":"8f0d5c0e-3b1a-4d7e-9a35-2f8b1c7e4a10","hardwareId":"SN-1","kind":"PASS","state":"FREE","direction":"IN","readingAt":"2026-10-09T13:05:12Z"}
-            PASS without direction    | {"eventId":"8f0d5c0e-3b1a-4d7e-9a35-2f8b1c7e4a10","hardwareId":"SN-1","kind":"PASS","readingAt":"2026-10-09T13:05:12Z"}
-            HEARTBEAT with state      | {"eventId":"8f0d5c0e-3b1a-4d7e-9a35-2f8b1c7e4a10","hardwareId":"SN-1","kind":"HEARTBEAT","state":"FREE","readingAt":"2026-10-09T13:05:12Z"}
-            missing readingAt         | {"eventId":"8f0d5c0e-3b1a-4d7e-9a35-2f8b1c7e4a10","hardwareId":"SN-1","kind":"HEARTBEAT"}
-            readingAt not an instant  | {"eventId":"8f0d5c0e-3b1a-4d7e-9a35-2f8b1c7e4a10","hardwareId":"SN-1","kind":"HEARTBEAT","readingAt":"2026-10-09 13:05"}
-            battery above 100         | {"eventId":"8f0d5c0e-3b1a-4d7e-9a35-2f8b1c7e4a10","hardwareId":"SN-1","kind":"HEARTBEAT","readingAt":"2026-10-09T13:05:12Z","battery":101}
-            battery below 0           | {"eventId":"8f0d5c0e-3b1a-4d7e-9a35-2f8b1c7e4a10","hardwareId":"SN-1","kind":"HEARTBEAT","readingAt":"2026-10-09T13:05:12Z","battery":-1}
-            battery not an integer    | {"eventId":"8f0d5c0e-3b1a-4d7e-9a35-2f8b1c7e4a10","hardwareId":"SN-1","kind":"HEARTBEAT","readingAt":"2026-10-09T13:05:12Z","battery":"82"}
-            signal not an integer     | {"eventId":"8f0d5c0e-3b1a-4d7e-9a35-2f8b1c7e4a10","hardwareId":"SN-1","kind":"HEARTBEAT","readingAt":"2026-10-09T13:05:12Z","signal":-71.5}
+            missing eventId           | {"sensorId":"SN-1","kind":"HEARTBEAT","ts":"2026-10-09T13:05:12Z"}
+            eventId not a UUID        | {"eventId":"evt-1","sensorId":"SN-1","kind":"HEARTBEAT","ts":"2026-10-09T13:05:12Z"}
+            eventId not a string      | {"eventId":12,"sensorId":"SN-1","kind":"HEARTBEAT","ts":"2026-10-09T13:05:12Z"}
+            missing sensorId          | {"eventId":"8f0d5c0e-3b1a-4d7e-9a35-2f8b1c7e4a10","kind":"HEARTBEAT","ts":"2026-10-09T13:05:12Z"}
+            blank sensorId            | {"eventId":"8f0d5c0e-3b1a-4d7e-9a35-2f8b1c7e4a10","sensorId":" ","kind":"HEARTBEAT","ts":"2026-10-09T13:05:12Z"}
+            missing kind              | {"eventId":"8f0d5c0e-3b1a-4d7e-9a35-2f8b1c7e4a10","sensorId":"SN-1","ts":"2026-10-09T13:05:12Z"}
+            unknown kind              | {"eventId":"8f0d5c0e-3b1a-4d7e-9a35-2f8b1c7e4a10","sensorId":"SN-1","kind":"DOOR","ts":"2026-10-09T13:05:12Z"}
+            SPACE without state       | {"eventId":"8f0d5c0e-3b1a-4d7e-9a35-2f8b1c7e4a10","sensorId":"SN-1","kind":"SPACE","ts":"2026-10-09T13:05:12Z"}
+            unknown state             | {"eventId":"8f0d5c0e-3b1a-4d7e-9a35-2f8b1c7e4a10","sensorId":"SN-1","kind":"SPACE","state":"BUSY","ts":"2026-10-09T13:05:12Z"}
+            PASS with state           | {"eventId":"8f0d5c0e-3b1a-4d7e-9a35-2f8b1c7e4a10","sensorId":"SN-1","kind":"PASS","state":"FREE","direction":"IN","ts":"2026-10-09T13:05:12Z"}
+            PASS without direction    | {"eventId":"8f0d5c0e-3b1a-4d7e-9a35-2f8b1c7e4a10","sensorId":"SN-1","kind":"PASS","ts":"2026-10-09T13:05:12Z"}
+            HEARTBEAT with state      | {"eventId":"8f0d5c0e-3b1a-4d7e-9a35-2f8b1c7e4a10","sensorId":"SN-1","kind":"HEARTBEAT","state":"FREE","ts":"2026-10-09T13:05:12Z"}
+            missing ts                | {"eventId":"8f0d5c0e-3b1a-4d7e-9a35-2f8b1c7e4a10","sensorId":"SN-1","kind":"HEARTBEAT"}
+            ts not an instant         | {"eventId":"8f0d5c0e-3b1a-4d7e-9a35-2f8b1c7e4a10","sensorId":"SN-1","kind":"HEARTBEAT","ts":"2026-10-09 13:05"}
+            battery above 100         | {"eventId":"8f0d5c0e-3b1a-4d7e-9a35-2f8b1c7e4a10","sensorId":"SN-1","kind":"HEARTBEAT","ts":"2026-10-09T13:05:12Z","battery":101}
+            battery below 0           | {"eventId":"8f0d5c0e-3b1a-4d7e-9a35-2f8b1c7e4a10","sensorId":"SN-1","kind":"HEARTBEAT","ts":"2026-10-09T13:05:12Z","battery":-1}
+            battery not an integer    | {"eventId":"8f0d5c0e-3b1a-4d7e-9a35-2f8b1c7e4a10","sensorId":"SN-1","kind":"HEARTBEAT","ts":"2026-10-09T13:05:12Z","battery":"82"}
+            rssi not an integer       | {"eventId":"8f0d5c0e-3b1a-4d7e-9a35-2f8b1c7e4a10","sensorId":"SN-1","kind":"HEARTBEAT","ts":"2026-10-09T13:05:12Z","rssi":-71.5}
             """)
     void rejectsAPayloadOutsideTheReadingContract(String description, String payload) {
         assertThatThrownBy(() -> translator.translate(TOPIC, bytes(payload)))

@@ -6,6 +6,7 @@ import com.upc.quadrapp.parkingsensing.domain.services.SensorReadingCommandServi
 import com.upc.quadrapp.parkingsensing.infrastructure.readings.security.VerifiedGatewayPrincipal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -25,7 +26,9 @@ import java.util.Objects;
  * of that institution and gateway. The message is acknowledged only after it was processed, so a
  * crash before that makes the broker deliver it again; duplicates are dropped by {@code eventId}.
  * <p>
- * A malformed message is stored as rejected and acknowledged. A processing failure is retried up
+ * A malformed message is stored as rejected and acknowledged. So is a reading whose topic does
+ * not match the device (another institution, or a gateway that may not report it): it is
+ * discarded without retrying. Any other processing failure is retried up
  * to {@value #MAX_RETRIES} times; if it still fails, the message is stored as rejected and
  * acknowledged so it does not block the next ones. Incidents for rejected readings are registered
  * by the sensing service itself. If the rejected message cannot be stored, it is not acknowledged.
@@ -78,6 +81,12 @@ public class MqttInboundListener {
                 process(gatewayReading);
                 lastFailure = null;
                 break;
+            } catch (AccessDeniedException | SecurityException mismatch) {
+                LOGGER.warn("Discarded reading {} on {}: {}", gatewayReading.reading().eventId(), topic,
+                        mismatch.getMessage());
+                rejected.store(topic, text, "Source mismatch: " + describe(mismatch), receivedAt);
+                acknowledge.run();
+                return;
             } catch (RuntimeException failure) {
                 lastFailure = failure;
                 LOGGER.warn("Reading {} on {} failed (attempt {} of {}): {}", gatewayReading.reading().eventId(),
@@ -86,7 +95,7 @@ public class MqttInboundListener {
         }
         if (lastFailure != null) {
             rejected.store(topic, text, "Processing failed after " + (1 + MAX_RETRIES) + " attempts: "
-                    + lastFailure.getClass().getSimpleName() + ": " + lastFailure.getMessage(), receivedAt);
+                    + describe(lastFailure), receivedAt);
         }
         acknowledge.run();
     }
@@ -102,6 +111,10 @@ public class MqttInboundListener {
         } finally {
             SecurityContextHolder.clearContext();
         }
+    }
+
+    private static String describe(RuntimeException failure) {
+        return failure.getClass().getSimpleName() + ": " + failure.getMessage();
     }
 
     private void pauseBeforeRetry(int retry) {

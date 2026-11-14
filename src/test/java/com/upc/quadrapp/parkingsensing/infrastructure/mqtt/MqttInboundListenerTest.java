@@ -11,7 +11,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
@@ -43,8 +46,8 @@ class MqttInboundListenerTest {
     private static final Instant NOW = Instant.parse("2026-11-14T12:00:00Z");
     private static final String TOPIC = "quadrapp/7/GW-01/readings";
     private static final String VALID = """
-            {"eventId":"8f0d5c0e-3b1a-4d7e-9a35-2f8b1c7e4a10","hardwareId":"SN-1","kind":"SPACE",
-             "state":"OCCUPIED","readingAt":"2026-11-14T11:59:58Z","battery":80}""";
+            {"eventId":"8f0d5c0e-3b1a-4d7e-9a35-2f8b1c7e4a10","sensorId":"SN-1","kind":"SPACE",
+             "state":"OCCUPIED","ts":"2026-11-14T11:59:58Z","battery":80}""";
 
     private final SensorReadingCommandService readings = mock(SensorReadingCommandService.class);
     private final RejectedReadingStorePort rejected = mock(RejectedReadingStorePort.class);
@@ -115,6 +118,25 @@ class MqttInboundListenerTest {
                 eq("Processing failed after 4 attempts: DataAccessResourceFailureException: database down"), eq(NOW));
         order.verify(acknowledge).run();
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+    }
+
+    static List<RuntimeException> sourceMismatches() {
+        return List.of(new AccessDeniedException("Gateway is not active for this institution."),
+                new SecurityException("Device belongs to another institution."));
+    }
+
+    @ParameterizedTest
+    @MethodSource("sourceMismatches")
+    void discardsAReadingWhoseTopicDoesNotMatchTheDeviceWithoutRetrying(RuntimeException mismatch) {
+        when(readings.handle(any())).thenThrow(mismatch);
+
+        listener.onReading(TOPIC, bytes(VALID), acknowledge);
+
+        InOrder order = inOrder(readings, rejected, acknowledge);
+        order.verify(readings, times(1)).handle(any());
+        order.verify(rejected).store(eq(TOPIC), eq(VALID), eq("Source mismatch: "
+                + mismatch.getClass().getSimpleName() + ": " + mismatch.getMessage()), eq(NOW));
+        order.verify(acknowledge).run();
     }
 
     @Test

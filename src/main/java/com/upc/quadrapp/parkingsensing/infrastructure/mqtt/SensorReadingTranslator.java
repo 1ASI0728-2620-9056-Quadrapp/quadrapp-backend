@@ -19,8 +19,9 @@ import java.util.regex.Pattern;
  * <p>
  * It is the only component that knows the gateway contract: the topic
  * {@code quadrapp/{tenantId}/{gatewayId}/readings} and the JSON payload
- * ({@code eventId}, {@code hardwareId}, {@code kind}, {@code state}, {@code direction},
- * {@code readingAt}, {@code battery}, {@code signal}). Another sensing technology only needs
+ * ({@code eventId}, {@code sensorId}, {@code kind}, {@code state}, {@code direction}, {@code ts},
+ * {@code battery}, {@code rssi}), mapped to the {@link SensorReading} fields {@code hardwareId},
+ * {@code readingAt}, {@code batteryPercent} and {@code signalRssi}. Another sensing technology only needs
  * another translator (CON-16). The gateway identity is taken from the topic, which the broker
  * restricts per gateway, and never from the payload. Unknown payload fields are ignored.
  */
@@ -48,13 +49,13 @@ public class SensorReadingTranslator {
         try {
             SensorReading reading = new SensorReading(
                     eventId(json),
-                    requiredText(json, "hardwareId"),
+                    requiredText(json, "sensorId"),
                     enumValue(json, "kind", ReadingKind.class, true),
                     enumValue(json, "state", SensorState.class, false),
                     enumValue(json, "direction", PassDirection.class, false),
                     readingAt(json),
                     optionalInteger(json, "battery"),
-                    optionalInteger(json, "signal"),
+                    optionalInteger(json, "rssi"),
                     gatewayHardwareId
             );
             return new GatewayReading(institutionId, reading);
@@ -98,11 +99,11 @@ public class SensorReadingTranslator {
     }
 
     private static Instant readingAt(JsonNode json) {
-        String value = requiredText(json, "readingAt");
+        String value = requiredText(json, "ts");
         try {
             return Instant.parse(value.trim());
         } catch (DateTimeParseException invalid) {
-            throw new MalformedReadingException("readingAt must be an ISO-8601 instant.");
+            throw new MalformedReadingException("ts must be an ISO-8601 instant.");
         }
     }
 
