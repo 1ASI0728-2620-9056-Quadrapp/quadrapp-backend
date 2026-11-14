@@ -1,5 +1,6 @@
 package com.upc.quadrapp.parkingconfiguration.application.internal.commandservices;
 
+import com.upc.quadrapp.parkingconfiguration.domain.model.exceptions.ParkingConfigurationNotFoundException;
 import com.upc.quadrapp.parkingconfiguration.application.internal.outboundservices.authorization.ParkingConfigurationAuthorizationPort;
 import com.upc.quadrapp.parkingconfiguration.application.internal.outboundservices.persistence.*;
 
@@ -81,7 +82,7 @@ public final class ParkingConfigurationCommandServiceImpl
     @Override
     public Zone handle(CreateZoneCommand command) {
 
-        ParkingLot lot = requireLot(command.parkingLotId());
+        ParkingLot lot = requireLot(command.parkingLotId(), "Parking lot not found.");
 
         authorization.requireInstitutionWrite(
                 lot.getInstitutionId()
@@ -112,7 +113,7 @@ public final class ParkingConfigurationCommandServiceImpl
 
         Zone zone = requireZone(command.zoneId());
 
-        ParkingLot lot = requireLot(zone.getParkingLotId());
+        ParkingLot lot = requireLot(zone.getParkingLotId(), "Zone not found.");
 
         authorization.requireInstitutionWrite(
                 lot.getInstitutionId()
@@ -142,14 +143,14 @@ public final class ParkingConfigurationCommandServiceImpl
 
         Level level = levels.findById(command.levelId())
                 .orElseThrow(
-                        () -> new IllegalArgumentException(
+                        () -> new ParkingConfigurationNotFoundException(
                                 "Level not found."
                         )
                 );
 
         Zone zone = requireZone(level.getZoneId());
 
-        ParkingLot lot = requireLot(zone.getParkingLotId());
+        ParkingLot lot = requireLot(zone.getParkingLotId(), "Level not found.");
 
         authorization.requireInstitutionWrite(
                 lot.getInstitutionId()
@@ -178,7 +179,7 @@ public final class ParkingConfigurationCommandServiceImpl
     @Override
     public Access handle(CreateAccessCommand command) {
 
-        ParkingLot lot = requireLot(command.parkingLotId());
+        ParkingLot lot = requireLot(command.parkingLotId(), "Parking lot not found.");
 
         authorization.requireInstitutionWrite(
                 lot.getInstitutionId()
@@ -203,19 +204,31 @@ public final class ParkingConfigurationCommandServiceImpl
         return accesses.save(value);
     }
 
-    private ParkingLot requireLot(Long id) {
-        return lots.findById(id)
+    /**
+     * The parking lot that holds the requested resource. A lot of another institution answers
+     * with the same "not found" message as a missing resource, so its existence is not revealed.
+     */
+    private ParkingLot requireLot(Long id, String notFoundMessage) {
+        ParkingLot lot = lots.findById(id)
                 .orElseThrow(
-                        () -> new IllegalArgumentException(
-                                "Parking lot not found."
+                        () -> new ParkingConfigurationNotFoundException(
+                                notFoundMessage
                         )
                 );
+
+        if (!authorization.canRead(lot.getInstitutionId())) {
+            throw new ParkingConfigurationNotFoundException(
+                    notFoundMessage
+            );
+        }
+
+        return lot;
     }
 
     private Zone requireZone(Long id) {
         return zones.findById(id)
                 .orElseThrow(
-                        () -> new IllegalArgumentException(
+                        () -> new ParkingConfigurationNotFoundException(
                                 "Zone not found."
                         )
                 );

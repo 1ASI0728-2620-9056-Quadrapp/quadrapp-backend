@@ -209,14 +209,17 @@ public class SensorReadingCommandServiceImpl implements SensorReadingCommandServ
         };
 
         if (!valid) {
-            registerIncident(
-                    device.getInstitutionId(),
-                    device.getParkingLotId(),
-                    device.getId(),
-                    device.getHardwareId(),
-                    IncidentType.UNMAPPED_SENSOR,
-                    "Reading kind does not match device assignment."
-            );
+            // Retries of a rejected reading do not open more incidents while one is still open.
+            if (!incidents.existsOpen(device.getId(), IncidentType.UNMAPPED_SENSOR)) {
+                registerIncident(
+                        device.getInstitutionId(),
+                        device.getParkingLotId(),
+                        device.getId(),
+                        device.getHardwareId(),
+                        IncidentType.UNMAPPED_SENSOR,
+                        "Reading kind does not match device assignment."
+                );
+            }
 
             throw new IllegalStateException(
                     "Reading not allowed for device assignment."

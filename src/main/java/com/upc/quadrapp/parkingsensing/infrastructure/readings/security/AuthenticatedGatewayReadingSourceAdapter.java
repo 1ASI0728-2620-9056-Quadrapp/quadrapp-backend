@@ -33,5 +33,15 @@ public class AuthenticatedGatewayReadingSourceAdapter implements TrustedReadingS
                 || gatewayDevice.getStatus() == DeviceStatus.DECOMMISSIONED) {
             throw new AccessDeniedException("Gateway is not active for this institution.");
         }
+        // Every sensor reports through its own gateway (CON-15, D7a): a gateway may only send
+        // its own readings and those of the sensors linked to it. An unknown sensor is rejected
+        // later as an unknown device.
+        if (!reading.hardwareId().equals(gateway.gatewayHardwareId())) {
+            devices.findByHardwareId(reading.hardwareId())
+                    .filter(sensor -> !gatewayDevice.getId().equals(sensor.getGatewayId()))
+                    .ifPresent(sensor -> {
+                        throw new AccessDeniedException("Sensor is not linked to this gateway.");
+                    });
+        }
     }
 }

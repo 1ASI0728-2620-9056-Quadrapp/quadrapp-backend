@@ -30,7 +30,8 @@ import static org.mockito.Mockito.when;
 
 /**
  * A reading that does not match the device assignment is rejected, and the incident that
- * records the rejection stays stored: rejecting the reading must not roll it back.
+ * records the rejection stays stored: rejecting the reading must not roll it back. Retries of
+ * rejected readings do not open more incidents while one is still open.
  */
 @QuadrappIntegrationTest
 class SensorReadingIncidentIntegrationTest {
@@ -79,5 +80,32 @@ class SensorReadingIncidentIntegrationTest {
         assertThat(jdbc.queryForList(
                 "select type from sensing.device_incidents where device_id = 999", String.class))
                 .containsExactly("UNMAPPED_SENSOR");
+    }
+
+    @Test
+    void retriesOfRejectedReadingsKeepASingleOpenIncident() {
+        Device passSensor = Device.restore(998L, 1L, 2L, "HW-INCIDENT-2", DeviceType.PASS_SENSOR, 60,
+                DeviceStatus.OPERATIONAL, null, null, null, null, 1L, null, Boolean.FALSE, null, null,
+                null, null, NOW, NOW);
+        when(devices.findByHardwareId(anyString())).thenReturn(Optional.of(passSensor));
+        when(processing.processOnce(any(), any(), any(), any()))
+                .thenAnswer(invocation -> ((Supplier<?>) invocation.getArgument(3)).get());
+        jdbc.update("insert into configuration.parking_lots (id, accuracy_margin_pct, active, flow_window_minutes, "
+                + "freed_debounce_s, layout_version, low_battery_threshold_pct, occupied_debounce_s, "
+                + "saturation_threshold_pct, stale_after_seconds, created_at, institution_id, updated_at, name) "
+                + "values (2, 5, true, 15, 10, 1, 20, 10, 90, 300, now(), 1, now(), 'Incident lot') "
+                + "on conflict do nothing");
+        jdbc.update("delete from sensing.device_incidents where device_id = 998");
+
+        for (int attempt = 1; attempt <= 3; attempt++) {
+            SensorReading retry = new SensorReading("evt-retry-" + attempt, "HW-INCIDENT-2", ReadingKind.SPACE,
+                    SensorState.OCCUPIED, null, NOW.plusSeconds(attempt), null, null, null);
+            assertThatThrownBy(() -> service.handle(new ProcessSensorReadingCommand(1L, retry)))
+                    .isInstanceOf(IllegalStateException.class);
+        }
+
+        assertThat(jdbc.queryForObject(
+                "select count(*) from sensing.device_incidents where device_id = 998 and resolved_at is null",
+                Integer.class)).isOne();
     }
 }

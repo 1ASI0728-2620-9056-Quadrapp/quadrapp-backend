@@ -1,5 +1,6 @@
 package com.upc.quadrapp.parkingconfiguration.application.internal.queryservices;
 
+import com.upc.quadrapp.parkingconfiguration.domain.model.exceptions.ParkingConfigurationNotFoundException;
 import com.upc.quadrapp.parkingconfiguration.application.internal.outboundservices.authorization.ParkingConfigurationAuthorizationPort;
 import com.upc.quadrapp.parkingconfiguration.application.internal.outboundservices.persistence.*;
 
@@ -46,13 +47,10 @@ public final class ParkingConfigurationQueryServiceImpl
                 query.parkingLotId()
         );
 
-        lot.ifPresent(value ->
-                authorization.requireInstitutionRead(
-                        value.getInstitutionId()
-                )
+        // A lot of another institution looks missing (404), so its existence is not revealed.
+        return lot.filter(value ->
+                authorization.canRead(value.getInstitutionId())
         );
-
-        return lot;
     }
 
     @Override
@@ -75,11 +73,8 @@ public final class ParkingConfigurationQueryServiceImpl
     ) {
 
         ParkingLot lot = requireLot(
-                query.parkingLotId()
-        );
-
-        authorization.requireInstitutionRead(
-                lot.getInstitutionId()
+                query.parkingLotId(),
+                "Parking lot not found."
         );
 
         return zones.findByParkingLotId(
@@ -96,12 +91,9 @@ public final class ParkingConfigurationQueryServiceImpl
                 query.zoneId()
         );
 
-        ParkingLot lot = requireLot(
-                zone.getParkingLotId()
-        );
-
-        authorization.requireInstitutionRead(
-                lot.getInstitutionId()
+        requireLot(
+                zone.getParkingLotId(),
+                "Zone not found."
         );
 
         return levels.findByZoneId(
@@ -117,7 +109,7 @@ public final class ParkingConfigurationQueryServiceImpl
         Level level = levels.findById(
                 query.levelId()
         ).orElseThrow(
-                () -> new IllegalArgumentException(
+                () -> new ParkingConfigurationNotFoundException(
                         "Level not found."
                 )
         );
@@ -126,12 +118,9 @@ public final class ParkingConfigurationQueryServiceImpl
                 level.getZoneId()
         );
 
-        ParkingLot lot = requireLot(
-                zone.getParkingLotId()
-        );
-
-        authorization.requireInstitutionRead(
-                lot.getInstitutionId()
+        requireLot(
+                zone.getParkingLotId(),
+                "Level not found."
         );
 
         return spaces.findByLevelId(
@@ -145,11 +134,8 @@ public final class ParkingConfigurationQueryServiceImpl
     ) {
 
         ParkingLot lot = requireLot(
-                query.parkingLotId()
-        );
-
-        authorization.requireInstitutionRead(
-                lot.getInstitutionId()
+                query.parkingLotId(),
+                "Parking lot not found."
         );
 
         return accesses.findByParkingLotId(
@@ -157,21 +143,32 @@ public final class ParkingConfigurationQueryServiceImpl
         );
     }
 
-    private ParkingLot requireLot(Long id) {
-
-        return lots.findById(id)
+    /**
+     * The parking lot that holds the requested resource. A lot of another institution answers
+     * with the same "not found" message as a missing resource, so its existence is not revealed.
+     */
+    private ParkingLot requireLot(Long id, String notFoundMessage) {
+        ParkingLot lot = lots.findById(id)
                 .orElseThrow(
-                        () -> new IllegalArgumentException(
-                                "Parking lot not found."
+                        () -> new ParkingConfigurationNotFoundException(
+                                notFoundMessage
                         )
                 );
+
+        if (!authorization.canRead(lot.getInstitutionId())) {
+            throw new ParkingConfigurationNotFoundException(
+                    notFoundMessage
+            );
+        }
+
+        return lot;
     }
 
     private Zone requireZone(Long id) {
 
         return zones.findById(id)
                 .orElseThrow(
-                        () -> new IllegalArgumentException(
+                        () -> new ParkingConfigurationNotFoundException(
                                 "Zone not found."
                         )
                 );
