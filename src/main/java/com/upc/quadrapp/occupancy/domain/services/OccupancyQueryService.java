@@ -23,4 +23,7 @@ public interface OccupancyQueryService {
     );
 
     OccupancySummary getByParkingLotForInternalUse(Long parkingLotId);
+
+    /** Whether the authenticated user may see the parking lot (used to authorize subscriptions). */
+    boolean isReadableParkingLot(Long parkingLotId);
 }

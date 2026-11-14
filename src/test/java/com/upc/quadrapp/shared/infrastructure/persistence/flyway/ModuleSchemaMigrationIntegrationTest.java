@@ -27,7 +27,8 @@ class ModuleSchemaMigrationIntegrationTest {
             "iam", List.of("institution_domains", "institutions", "refresh_tokens", "users"),
             "configuration", List.of("accesses", "calendar_events", "levels", "parking_lots", "spaces", "zones"),
             "sensing", List.of("device_incidents", "devices"),
-            "occupancy", List.of("occupancy_snapshots", "sensor_events"),
+            "occupancy", List.of("lot_access_points", "lot_occupancy", "occupancy_snapshots", "sensor_events",
+                    "space_occupancy", "vehicle_passages"),
             "prediction", List.of("forecasts"));
 
     @Autowired

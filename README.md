@@ -51,6 +51,22 @@ Each bounded context owns a PostgreSQL schema, with no foreign keys between sche
 - The JDBC event publication registry (`shared.event_publication`) stores each event in the same transaction that produced it (transactional outbox). Publications not completed when the application stops are published again on restart, so listeners must drop duplicates (for example by `eventId`).
 - The backend runs as several replicas, so every `@Scheduled` job must also carry `@SchedulerLock` (ShedLock, table `shared.shedlock`): only one replica runs each execution.
 
+## Occupancy
+
+- Occupancy owns the state of every space (`occupancy.space_occupancy`: FREE, OCCUPIED or UNKNOWN with its reason) and of every parking lot (`occupancy.lot_occupancy`: counts of the active spaces and the low-availability condition). Both tables use optimistic locking (`version`), and every write locks the parking lot row first, so detections of one lot are applied one at a time.
+- Space states change only with the Parking Sensing events (`SensingEventListener`). A detection already applied (same `eventId`) or not after the last applied one changes nothing; an inactive space never changes state and is not counted; a new space starts UNKNOWN. Events that can never apply (unknown parking lot, another institution, a space or access outside the layout) are logged and dropped instead of failing forever.
+- The layout comes only from the Parking Configuration facade (`ParkingConfigurationContextFacade.layoutOf`), never from SQL on the `configuration` schema. Occupancy copies it the first time it sees a parking lot, again when the copy is older than `quadrapp.occupancy.layout-max-age` (default `PT1M`), and when a detection names a space or access the copy does not have yet. Occupancy no longer writes the space status into Parking Configuration.
+- Low availability starts when the free spaces fall below the lot's `lowAvailabilityPct` (5-30 %, 10 % by default, set when registering the parking lot) and ends when they rise above that value plus 5 points. With no known space (all UNKNOWN) the condition does not change.
+- Published events (`occupancy.domain.model.events`): `SpaceMarkedOccupied`, `SpaceMarkedFree`, `SpaceMarkedUnknown` (with `tenantId`), `LowAvailabilityStarted` and `LowAvailabilityEnded`.
+- REST: `GET /api/v1/parking-lots/{id}/occupancy`, `GET /api/v1/zones/{id}/occupancy`, `GET /api/v1/levels/{id}/occupancy`, `POST` and `GET /api/v1/zones/{id}/occupancy-snapshots` keep their routes and responses. A resource of another institution answers 404 with the same message as a missing one. Without `from` and `to`, the snapshot history covers the last 24 hours.
+
+### Real-time occupancy (STOMP)
+
+- Endpoint `/ws` (STOMP over WebSocket). The CONNECT frame must carry `Authorization: Bearer <access token>`, the same token as the REST API.
+- Subscribe to `/topic/parking-lots/{lotId}/occupancy`; only parking lots of the user's institution are allowed. A refused frame closes the session with an ERROR frame that names the reason.
+- Each message holds the zone and parking lot counts, `lowAvailability`, `consolidatedAt` and the spaces of the zone that changed. A quiet zone is sent at once; during a burst (for example a gateway replaying its buffer) at most the last state of each zone is sent per second.
+- Allowed browser origins: `quadrapp.realtime.allowed-origins` (default `*`; the token, not a cookie, authenticates). The broker is in memory, so each replica delivers the changes it processed to its own clients.
+
 ## Tests
 
 ```bash

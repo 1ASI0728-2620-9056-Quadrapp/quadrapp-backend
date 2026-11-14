@@ -5,8 +5,13 @@ import com.upc.quadrapp.occupancy.domain.model.valueobjects.OccupancyCounts;
 import java.time.Instant;
 import java.util.Objects;
 
+/**
+ * Availability of one zone at one moment. Snapshots saved before Occupancy owned its state have
+ * no parking lot.
+ */
 public record OccupancySnapshot(
         Long id,
+        Long parkingLotId,
         Long zoneId,
         Instant takenAt,
         OccupancyCounts counts
@@ -24,10 +29,11 @@ public record OccupancySnapshot(
     }
 
     public static OccupancySnapshot create(
+            Long parkingLotId,
             Long zoneId,
             Instant takenAt,
             OccupancyCounts counts
     ) {
-        return new OccupancySnapshot(null, zoneId, takenAt, counts);
+        return new OccupancySnapshot(null, parkingLotId, zoneId, takenAt, counts);
     }
 }
