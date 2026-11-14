@@ -52,8 +52,8 @@ public class ParkingSensingServicesConfiguration {
             TrustedReadingSourcePort trustedSources, ReadingProcessingPort processing,
             DevicePersistencePort devices, DeviceIncidentPersistencePort incidents,
             ParkingConfigurationLookupPort configuration, SensorFeedStatePort feeds,
-            OccupancyDetectionPublisherPort occupancy, Clock clock) {
+            SensingEventPublisherPort events, Clock clock) {
         return new SensorReadingCommandServiceImpl(trustedSources, processing, devices,
-                incidents, configuration, feeds, occupancy, clock);
+                incidents, configuration, feeds, events, clock);
     }
 }

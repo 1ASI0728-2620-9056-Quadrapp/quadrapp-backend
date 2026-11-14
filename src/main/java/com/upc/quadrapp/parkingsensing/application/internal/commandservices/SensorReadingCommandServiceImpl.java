@@ -1,7 +1,7 @@
 package com.upc.quadrapp.parkingsensing.application.internal.commandservices;
 
 import com.upc.quadrapp.parkingsensing.application.internal.outboundservices.configuration.ParkingConfigurationLookupPort;
-import com.upc.quadrapp.parkingsensing.application.internal.outboundservices.events.OccupancyDetectionPublisherPort;
+import com.upc.quadrapp.parkingsensing.application.internal.outboundservices.events.SensingEventPublisherPort;
 import com.upc.quadrapp.parkingsensing.application.internal.outboundservices.persistence.*;
 import com.upc.quadrapp.parkingsensing.application.internal.outboundservices.readings.*;
 
@@ -11,11 +11,13 @@ import com.upc.quadrapp.parkingsensing.domain.model.entities.DeviceIncident;
 import com.upc.quadrapp.parkingsensing.domain.model.valueobjects.*;
 import com.upc.quadrapp.parkingsensing.domain.services.SensorReadingCommandService;
 
+import org.springframework.transaction.annotation.Transactional;
+
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Objects;
 
-public final class SensorReadingCommandServiceImpl implements SensorReadingCommandService {
+public class SensorReadingCommandServiceImpl implements SensorReadingCommandService {
 
     private final TrustedReadingSourcePort trustedSources;
     private final ReadingProcessingPort processing;
@@ -23,7 +25,7 @@ public final class SensorReadingCommandServiceImpl implements SensorReadingComma
     private final DeviceIncidentPersistencePort incidents;
     private final ParkingConfigurationLookupPort configuration;
     private final SensorFeedStatePort feeds;
-    private final OccupancyDetectionPublisherPort occupancy;
+    private final SensingEventPublisherPort events;
     private final Clock clock;
 
     public SensorReadingCommandServiceImpl(
@@ -33,7 +35,7 @@ public final class SensorReadingCommandServiceImpl implements SensorReadingComma
             DeviceIncidentPersistencePort incidents,
             ParkingConfigurationLookupPort configuration,
             SensorFeedStatePort feeds,
-            OccupancyDetectionPublisherPort occupancy,
+            SensingEventPublisherPort events,
             Clock clock
     ) {
         this.trustedSources = Objects.requireNonNull(trustedSources);
@@ -42,11 +44,15 @@ public final class SensorReadingCommandServiceImpl implements SensorReadingComma
         this.incidents = Objects.requireNonNull(incidents);
         this.configuration = Objects.requireNonNull(configuration);
         this.feeds = Objects.requireNonNull(feeds);
-        this.occupancy = Objects.requireNonNull(occupancy);
+        this.events = Objects.requireNonNull(events);
         this.clock = Objects.requireNonNull(clock);
     }
 
+    /**
+     * Saves the reading and publishes its domain events in one transaction (transactional outbox).
+     */
     @Override
+    @Transactional
     public SensorReadingResult handle(
             ProcessSensorReadingCommand command
     ) {
@@ -120,7 +126,7 @@ public final class SensorReadingCommandServiceImpl implements SensorReadingComma
         }
 
         if (reading.kind() == ReadingKind.PASS) {
-            occupancy.publishPassageDetection(
+            events.publishPassageDetection(
                     institutionId,
                     device.getParkingLotId(),
                     device.getAccessId(),
@@ -156,7 +162,7 @@ public final class SensorReadingCommandServiceImpl implements SensorReadingComma
         );
 
         if (result.outcome() == ReadingOutcome.CONFIRMED) {
-            occupancy.publishSpaceDetection(
+            events.publishSpaceDetection(
                     institutionId,
                     device.getParkingLotId(),
                     device.getSpaceId(),
