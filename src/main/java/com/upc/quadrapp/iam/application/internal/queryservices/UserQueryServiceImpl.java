@@ -34,11 +34,10 @@ public class UserQueryServiceImpl implements UserQueryService {
                 query.userId()
         );
 
-        user.ifPresent(target ->
-                authorizationService.requireUserAccess(actor, target)
+        // A user the actor cannot see looks missing, so its existence is not revealed.
+        return user.filter(target ->
+                authorizationService.canAccessUser(actor, target)
         );
-
-        return user;
     }
 
     @Override
@@ -63,11 +62,10 @@ public class UserQueryServiceImpl implements UserQueryService {
                 email.value()
         );
 
-        user.ifPresent(target ->
-                authorizationService.requireUserAccess(actor, target)
+        // A user the actor cannot see looks missing, so its existence is not revealed.
+        return user.filter(target ->
+                authorizationService.canAccessUser(actor, target)
         );
-
-        return user;
     }
 
     @Override
