@@ -26,7 +26,8 @@ import java.util.regex.Pattern;
  * <ul>
  *     <li>CONNECT must carry {@code Authorization: Bearer <access token>}; the token is validated
  *     with the same decoder as the resource server and becomes the user of the session.</li>
- *     <li>SUBSCRIBE is allowed only to {@code /topic/parking-lots/{lotId}/occupancy} of a parking
+ *     <li>SUBSCRIBE is allowed only to {@code /topic/parking-lots/{lotId}/occupancy} (Occupancy) and
+ *     {@code /topic/parking-lots/{lotId}/forecasts} (Prediction) of a parking
  *     lot the user can read; another institution's lot is refused like a missing one.</li>
  *     <li>Clients cannot SEND: the channel only delivers changes.</li>
  * </ul>
@@ -35,7 +36,7 @@ import java.util.regex.Pattern;
 @Component
 public class StompAuthorizationInterceptor implements ChannelInterceptor {
 
-    private static final Pattern OCCUPANCY_TOPIC = Pattern.compile("^/topic/parking-lots/(\\d{1,18})/occupancy$");
+    private static final Pattern PARKING_LOT_TOPIC = Pattern.compile("^/topic/parking-lots/(\\d{1,18})/(occupancy|forecasts)$");
     private static final String BEARER = "Bearer ";
 
     private final JwtDecoder jwtDecoder;
@@ -84,7 +85,7 @@ public class StompAuthorizationInterceptor implements ChannelInterceptor {
             throw new AccessDeniedException("The session is not authenticated.");
         }
         String destination = accessor.getDestination();
-        Matcher matcher = destination == null ? null : OCCUPANCY_TOPIC.matcher(destination);
+        Matcher matcher = destination == null ? null : PARKING_LOT_TOPIC.matcher(destination);
         if (matcher == null || !matcher.matches()) {
             throw new AccessDeniedException("Unknown destination.");
         }

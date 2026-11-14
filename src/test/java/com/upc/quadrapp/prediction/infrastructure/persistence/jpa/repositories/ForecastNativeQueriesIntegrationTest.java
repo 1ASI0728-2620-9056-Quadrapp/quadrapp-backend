@@ -66,6 +66,8 @@ class ForecastNativeQueriesIntegrationTest {
         forecast.setConfidenceLevel(ConfidenceLevel.HIGH);
         forecast.setMethod(ForecastMethod.PRIMARY_MODEL);
         forecast.setModelVersion("linear-trend-v1");
+        forecast.setRunId(java.util.UUID.randomUUID());
+        forecast.setRunSlot(generatedAt);
         if (absoluteError != null) {
             forecast.setObservedOccupancyPct(new BigDecimal("50.00").add(absoluteError));
             forecast.setAbsoluteError(absoluteError);

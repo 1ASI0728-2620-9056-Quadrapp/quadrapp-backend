@@ -1,10 +1,10 @@
 package com.upc.quadrapp.prediction.infrastructure.persistence.jpa.repositories;
 
+import com.upc.quadrapp.prediction.domain.model.valueobjects.ForecastTrigger;
 import com.upc.quadrapp.prediction.infrastructure.persistence.jpa.entities.ForecastJpaEntity;
-import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -30,18 +30,36 @@ public interface ForecastJpaRepository extends JpaRepository<ForecastJpaEntity, 
             @Param("parkingLotId") Long parkingLotId
     );
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    List<ForecastJpaEntity> findByParkingLotIdAndRunSlotAndTriggerOrderByHorizonMinutes(
+            Long parkingLotId,
+            Instant runSlot,
+            ForecastTrigger trigger
+    );
+
+    /** Uses the partial index on {@code target_at} of the forecasts not evaluated yet. */
     @Query("""
             SELECT forecast
             FROM ForecastJpaEntity forecast
-            WHERE forecast.targetAt <= :now
-              AND forecast.observedOccupancyPct IS NULL
+            WHERE forecast.targetAt <= :cutoff
+              AND forecast.evaluatedAt IS NULL
             ORDER BY forecast.targetAt
             """)
-    List<ForecastJpaEntity> findDueUnobserved(
-            @Param("now") Instant now,
+    List<ForecastJpaEntity> findDueUnevaluated(
+            @Param("cutoff") Instant cutoff,
             Pageable pageable
     );
+
+    @Modifying
+    @Query("""
+            UPDATE ForecastJpaEntity forecast
+            SET forecast.evaluatedAt = :evaluatedAt
+            WHERE forecast.id = :id AND forecast.evaluatedAt IS NULL
+            """)
+    int markEvaluated(@Param("id") Long id, @Param("evaluatedAt") Instant evaluatedAt);
+
+    @Modifying
+    @Query(value = "DELETE FROM prediction.forecasts WHERE generated_at < :cutoff", nativeQuery = true)
+    int deleteGeneratedBefore(@Param("cutoff") Instant cutoff);
 
     @Query(value = """
             SELECT COUNT(abs_error) AS "evaluatedForecasts",

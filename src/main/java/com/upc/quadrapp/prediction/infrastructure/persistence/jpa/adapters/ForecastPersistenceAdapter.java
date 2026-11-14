@@ -3,6 +3,7 @@ package com.upc.quadrapp.prediction.infrastructure.persistence.jpa.adapters;
 import com.upc.quadrapp.prediction.application.internal.outboundservices.persistence.ForecastPersistencePort;
 import com.upc.quadrapp.prediction.domain.model.aggregates.Forecast;
 import com.upc.quadrapp.prediction.domain.model.valueobjects.ForecastAccuracyMetrics;
+import com.upc.quadrapp.prediction.domain.model.valueobjects.ForecastTrigger;
 import com.upc.quadrapp.prediction.infrastructure.persistence.jpa.entities.ForecastJpaEntity;
 import com.upc.quadrapp.prediction.infrastructure.persistence.jpa.repositories.ForecastJpaRepository;
 import org.springframework.data.domain.PageRequest;
@@ -35,14 +36,40 @@ public class ForecastPersistenceAdapter implements ForecastPersistencePort {
     }
 
     @Override
-    public List<Forecast> findDueUnobserved(Instant now, int limit) {
-        if (limit < 1) {
-            throw new IllegalArgumentException("Forecast batch size must be positive.");
-        }
-        return repository.findDueUnobserved(now, PageRequest.of(0, limit))
+    public List<Forecast> findScheduledRun(Long parkingLotId, Instant runSlot) {
+        return repository.findByParkingLotIdAndRunSlotAndTriggerOrderByHorizonMinutes(
+                        parkingLotId, runSlot, ForecastTrigger.SCHEDULED)
                 .stream()
                 .map(ForecastPersistenceAdapter::toDomain)
                 .toList();
+    }
+
+    @Override
+    public List<Forecast> findDueUnevaluated(Instant cutoff, int limit) {
+        if (limit < 1) {
+            throw new IllegalArgumentException("Forecast batch size must be positive.");
+        }
+        return repository.findDueUnevaluated(cutoff, PageRequest.of(0, limit))
+                .stream()
+                .map(ForecastPersistenceAdapter::toDomain)
+                .toList();
+    }
+
+    @Override
+    public void saveObservation(Forecast observed, Instant evaluatedAt) {
+        ForecastJpaEntity entity = toJpa(observed);
+        entity.setEvaluatedAt(evaluatedAt);
+        repository.save(entity);
+    }
+
+    @Override
+    public void markUnobservable(Long forecastId, Instant evaluatedAt) {
+        repository.markEvaluated(forecastId, evaluatedAt);
+    }
+
+    @Override
+    public int deleteGeneratedBefore(Instant cutoff) {
+        return repository.deleteGeneratedBefore(cutoff);
     }
 
     @Override
@@ -70,6 +97,9 @@ public class ForecastPersistenceAdapter implements ForecastPersistencePort {
         entity.setSaturationExpectedAt(forecast.saturationExpectedAt());
         entity.setObservedOccupancyPct(forecast.observedOccupancyPct());
         entity.setAbsoluteError(forecast.absoluteError());
+        entity.setRunId(forecast.runId());
+        entity.setRunSlot(forecast.runSlot());
+        entity.setTrigger(forecast.trigger());
         return entity;
     }
 
@@ -87,7 +117,10 @@ public class ForecastPersistenceAdapter implements ForecastPersistencePort {
                 entity.getModelVersion(),
                 entity.getSaturationExpectedAt(),
                 entity.getObservedOccupancyPct(),
-                entity.getAbsoluteError()
+                entity.getAbsoluteError(),
+                entity.getRunId(),
+                entity.getRunSlot(),
+                entity.getTrigger()
         );
     }
 }
