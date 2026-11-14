@@ -1,2 +1,5 @@
-# Real secrets of the instance; only .env.example is committed.
+# Real secrets of the instance and of local test runs; only env.example is committed.
 .env
+*.env
+# Root certificate of Caddy's internal CA, exported during local tests.
+caddy-root.crt

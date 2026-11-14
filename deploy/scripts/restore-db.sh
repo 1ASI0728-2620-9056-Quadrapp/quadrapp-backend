@@ -4,6 +4,8 @@
 # The backend is stopped during the restore, which runs in one transaction: if it fails,
 # the database is left as it was.
 set -euo pipefail
+# cron runs with PATH=/usr/bin:/bin, but the AWS CLI v2 installer puts aws in /usr/local/bin.
+export PATH="/usr/local/bin:/usr/bin:/bin:${PATH:-}"
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 [ $# -ge 1 ] || die "Usage: $0 s3://<bucket>/<prefix>/<file>.dump [--yes]"

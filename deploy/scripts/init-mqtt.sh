@@ -15,6 +15,10 @@ backend_user=$(require_value MQTT_BACKEND_USERNAME)
 backend_password=$(require_value MQTT_BACKEND_PASSWORD)
 backend_role=backend-subscriber
 
+for value in "$admin_password" "$backend_password"; do
+	[ "$value" != "change-me" ] || die "Set real MQTT passwords in .env; change-me is only the template value."
+done
+
 if compose run --rm --no-deps -T --entrypoint test mosquitto -f /mosquitto/data/dynamic-security.json; then
 	echo "The dynamic security configuration already exists; keeping it."
 else

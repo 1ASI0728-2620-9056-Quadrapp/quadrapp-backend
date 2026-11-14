@@ -5,6 +5,8 @@
 # The dump is checked with pg_restore --list before the upload, so a failed dump is never
 # uploaded. Old dumps are removed by an S3 lifecycle rule, not by this script.
 set -euo pipefail
+# cron runs with PATH=/usr/bin:/bin, but the AWS CLI v2 installer puts aws in /usr/local/bin.
+export PATH="/usr/local/bin:/usr/bin:/bin:${PATH:-}"
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 command -v aws >/dev/null || die "The AWS CLI is not installed."
