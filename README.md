@@ -91,9 +91,9 @@ Each bounded context owns a PostgreSQL schema, with no foreign keys between sche
 
 ### Real-time occupancy (STOMP)
 
-- Endpoint `/ws` (STOMP over WebSocket). The CONNECT frame must carry `Authorization: Bearer <access token>`, the same token as the REST API.
-- Subscribe to `/topic/parking-lots/{lotId}/occupancy`; only parking lots of the user's institution are allowed. A refused frame closes the session with an ERROR frame that names the reason.
-- Each message holds the zone and parking lot counts, `lowAvailability`, `consolidatedAt` and the spaces of the zone that changed. A quiet zone is sent at once; during a burst (for example a gateway replaying its buffer) at most the last state of each zone is sent per second.
+- Endpoint `/ws` (STOMP over WebSocket). The CONNECT frame (or the STOMP 1.2 `STOMP` frame) must carry `Authorization: Bearer <access token>`, the same token as the REST API.
+- Subscribe to `/topic/parking-lots/{lotId}/occupancy`; only parking lots of the user's institution are allowed, and only while the session's access token has not expired (a client reconnects with a new token). A refused frame closes the session with an ERROR frame that names the reason.
+- Each message holds the zone and parking lot counts, `lowAvailability`, `consolidatedAt` and the spaces of the zone that changed. A quiet zone is sent at once; during a burst (for example a gateway replaying its buffer) at most the last state of each zone is sent per second. Changes may arrive out of order; the zone counts always come from the newest one (highest parking lot version) and a space never goes back to an older state.
 - Allowed browser origins: `quadrapp.realtime.allowed-origins` (default `*`; the token, not a cookie, authenticates). The broker is in memory, so each replica delivers the changes it processed to its own clients.
 
 ## Tests

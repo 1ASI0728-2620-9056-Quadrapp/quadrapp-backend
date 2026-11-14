@@ -17,6 +17,7 @@ import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -24,10 +25,12 @@ import java.util.regex.Pattern;
 /**
  * Authorizes the STOMP channel with the same access token as the REST API.
  * <ul>
- *     <li>CONNECT must carry {@code Authorization: Bearer <access token>}; the token is validated
- *     with the same decoder as the resource server and becomes the user of the session.</li>
+ *     <li>CONNECT (or the STOMP 1.2 {@code STOMP} frame) must carry
+ *     {@code Authorization: Bearer <access token>}; the token is validated with the same decoder
+ *     as the resource server and becomes the user of the session.</li>
  *     <li>SUBSCRIBE is allowed only to {@code /topic/parking-lots/{lotId}/occupancy} of a parking
- *     lot the user can read; another institution's lot is refused like a missing one.</li>
+ *     lot the user can read, while the session token has not expired; another institution's lot
+ *     is refused like a missing one.</li>
  *     <li>Clients cannot SEND: the channel only delivers changes.</li>
  * </ul>
  * A refused frame closes the session with a STOMP ERROR frame.
@@ -53,7 +56,7 @@ public class StompAuthorizationInterceptor implements ChannelInterceptor {
             return message;
         }
         StompCommand command = accessor.getCommand();
-        if (command == StompCommand.CONNECT) {
+        if (command == StompCommand.CONNECT || command == StompCommand.STOMP) {
             accessor.setUser(authenticate(accessor.getFirstNativeHeader("Authorization")));
         } else if (command == StompCommand.SUBSCRIBE) {
             authorizeSubscription(accessor);
@@ -82,6 +85,10 @@ public class StompAuthorizationInterceptor implements ChannelInterceptor {
     private void authorizeSubscription(StompHeaderAccessor accessor) {
         if (!(accessor.getUser() instanceof JwtAuthenticationToken user)) {
             throw new AccessDeniedException("The session is not authenticated.");
+        }
+        Instant expiresAt = user.getToken().getExpiresAt();
+        if (expiresAt == null || !expiresAt.isAfter(Instant.now())) {
+            throw new AccessDeniedException("The access token has expired.");
         }
         String destination = accessor.getDestination();
         Matcher matcher = destination == null ? null : OCCUPANCY_TOPIC.matcher(destination);
