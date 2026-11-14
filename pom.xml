@@ -29,6 +29,7 @@
     <properties>
         <java.version>25</java.version>
         <spring-modulith.version>2.1.2</spring-modulith.version>
+        <shedlock.version>7.11.0</shedlock.version>
     </properties>
     <dependencyManagement>
         <dependencies>
@@ -158,6 +159,18 @@
             <groupId>org.springframework.modulith</groupId>
             <artifactId>spring-modulith-starter-test</artifactId>
             <scope>test</scope>
+        </dependency>
+
+        <!-- Scheduled jobs run in one replica at a time (lock in the shared schema) -->
+        <dependency>
+            <groupId>net.javacrumbs.shedlock</groupId>
+            <artifactId>shedlock-spring</artifactId>
+            <version>${shedlock.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>net.javacrumbs.shedlock</groupId>
+            <artifactId>shedlock-provider-jdbc-template</artifactId>
+            <version>${shedlock.version}</version>
         </dependency>
 
     </dependencies>

@@ -9,7 +9,7 @@ import java.util.List;
 
 /**
  * Migrates the {@code shared} schema: infrastructure tables used by every module, such as the
- * Spring Modulith event publication registry. No bounded context stores domain data here.
+ * Spring Modulith event publication registry and the ShedLock locks. No bounded context stores domain data here.
  */
 @Configuration(proxyBeanMethods = false)
 public class SharedSchemaMigrationConfiguration {
@@ -17,7 +17,7 @@ public class SharedSchemaMigrationConfiguration {
     public static final String SCHEMA = "shared";
 
     /** Tables created by this schema's migrations. */
-    public static final List<String> TABLES = List.of("event_publication");
+    public static final List<String> TABLES = List.of("event_publication", "shedlock");
 
     @Bean
     public FlywayMigrationInitializer sharedSchemaMigration(DataSource dataSource) {
