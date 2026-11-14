@@ -7,8 +7,11 @@ import com.upc.quadrapp.support.QuadrappIntegrationTest;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.core.env.Environment;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.test.context.TestPropertySource;
@@ -34,8 +37,9 @@ import static org.mockito.Mockito.when;
 
 /**
  * A publication whose listener failed is delivered again by a periodic job, not only on restart,
- * up to a maximum number of attempts; completed publications are deleted after a retention
- * period, so the registry does not grow forever.
+ * up to a maximum number of attempts, including publications a stopped replica left incomplete
+ * (nothing is republished without limit on restart); completed publications are deleted after a
+ * retention period, so the registry does not grow forever.
  */
 @QuadrappIntegrationTest
 @TestPropertySource(properties = {"quadrapp.scheduling.enabled=false", "quadrapp.events.retry.min-age=PT0S"})
@@ -52,6 +56,9 @@ class EventPublicationMaintenanceIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private Environment environment;
 
     @MockitoBean
     private OccupancyCommandService occupancy;
@@ -81,6 +88,34 @@ class EventPublicationMaintenanceIntegrationTest {
                 .thenReturn(true);
         publishDetection();
         awaitStatus("FAILED");
+
+        maintenance.retryFailedPublications();
+
+        verify(occupancy, timeout(5_000).times(2)).handle(any(RecordSensorEventCommand.class));
+        awaitStatus("COMPLETED");
+    }
+
+    @Test
+    void incompletePublicationsAreNotRepublishedWithoutLimitOnRestart() {
+        assertThat(environment.getProperty("spring.modulith.events.republish-outstanding-events-on-restart",
+                Boolean.class)).isFalse();
+    }
+
+    /**
+     * A replica that stops while a publication is waiting or in progress leaves it incomplete; once
+     * it is older than the staleness limit it becomes FAILED and the retry job delivers it again.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"PUBLISHED", "PROCESSING", "RESUBMITTED"})
+    void aPublicationLeftIncompleteByAStoppedReplicaIsRetried(String leftStatus) {
+        when(occupancy.handle(any(RecordSensorEventCommand.class)))
+                .thenThrow(new IllegalStateException("Occupancy is unavailable."))
+                .thenReturn(true);
+        publishDetection();
+        awaitStatus("FAILED");
+        jdbc.update("update shared.event_publication set status = ?, "
+                + "publication_date = now() - interval '20 minutes', "
+                + "last_resubmission_date = now() - interval '20 minutes'", leftStatus);
 
         maintenance.retryFailedPublications();
 
