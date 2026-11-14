@@ -20,7 +20,10 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionOperations;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -80,7 +83,7 @@ public class ForecastCommandServiceImpl implements ForecastCommandService {
             PredictionModelPort model,
             ForecastRealtimePort realtime,
             ForecastDomainService domain,
-            TransactionOperations transactions,
+            PlatformTransactionManager transactionManager,
             @Qualifier("parkingSensingClock") Clock clock,
             @Value("${quadrapp.prediction.time-zone:America/Lima}") ZoneId timeZone
     ) {
@@ -91,7 +94,11 @@ public class ForecastCommandServiceImpl implements ForecastCommandService {
         this.model = model;
         this.realtime = realtime;
         this.domain = domain;
-        this.transactions = transactions;
+        // Every run and every evaluation commits on its own (REQUIRES_NEW), also when called from a
+        // listener's transaction: a lot or forecast that fails never rolls back the others.
+        TransactionTemplate ownTransaction = new TransactionTemplate(transactionManager);
+        ownTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        this.transactions = ownTransaction;
         this.clock = clock;
         this.timeZone = timeZone;
     }
@@ -147,16 +154,19 @@ public class ForecastCommandServiceImpl implements ForecastCommandService {
                 : parkingConfiguration.activeParkingLotIds();
         int runs = 0;
         for (Long candidate : candidates) {
-            Optional<LotProfile> lot = profileOf(candidate, now)
-                    .filter(profile -> profile.institutionId().equals(institutionId));
-            if (lot.isEmpty()) {
-                continue;
-            }
+            // One lot that cannot be forecast never stops the others; the listener always completes.
             try {
+                Optional<LotProfile> lot = profileOf(candidate, now)
+                        .filter(profile -> profile.institutionId().equals(institutionId));
+                if (lot.isEmpty()) {
+                    continue;
+                }
                 generateRun(lot.get(), ForecastTrigger.CAMPUS_EVENT, now);
                 runs++;
             } catch (IllegalStateException exception) {
                 LOGGER.debug("No forecast for parking lot {}: {}", candidate, exception.getMessage());
+            } catch (RuntimeException exception) {
+                LOGGER.warn("Campus-event forecast run failed for parking lot {}.", candidate, exception);
             }
         }
         return runs;
@@ -244,7 +254,7 @@ public class ForecastCommandServiceImpl implements ForecastCommandService {
         BigDecimal currentPct = occupancyPct(occupancy.currentOccupancyForInternalUse(lot.parkingLotId()));
         Optional<ModelPrediction> prediction = currentPct == null
                 ? Optional.empty()
-                : model.predict(features(currentPct, now, lot.campusEventAhead()));
+                : predict(features(currentPct, now, lot.campusEventAhead()));
         UUID runId = UUID.randomUUID();
 
         List<Forecast> result = new ArrayList<>();
@@ -265,6 +275,16 @@ public class ForecastCommandServiceImpl implements ForecastCommandService {
             )));
         }
         return result;
+    }
+
+    /** A model that fails gives no prediction, so the run uses the fallback (rule 6). */
+    private Optional<ModelPrediction> predict(Map<String, Double> features) {
+        try {
+            return model.predict(features);
+        } catch (RuntimeException exception) {
+            LOGGER.warn("The forecasting model failed; the fallback is used.", exception);
+            return Optional.empty();
+        }
     }
 
     private Optional<Fallback> fallbackOf(LotProfile lot, ForecastHorizon horizon, Instant now, BigDecimal currentPct) {
