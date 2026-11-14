@@ -83,4 +83,19 @@ class ReinviteUserIntegrationTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("Email is already registered.");
     }
+
+    @Test
+    void invitingAPendingUserOfAnotherInstitutionIsStillAConflict() {
+        String email = "ops@" + domain;
+        users.handle(new InviteUserCommand(institutionId, adminId, email, Roles.OPERATOR));
+        long otherInstitution = jdbc.queryForObject(
+                "insert into iam.institutions (name) values (?) returning id", Long.class, "Other " + domain);
+        long otherAdmin = jdbc.queryForObject("insert into iam.users (institution_id, role, email, status) "
+                + "values (?, 'ADMIN', ?, 'ACTIVE') returning id", Long.class, otherInstitution, "admin@other-" + domain);
+        when(currentUser.requireAuthenticatedUserId()).thenReturn(otherAdmin);
+
+        assertThatThrownBy(() -> users.handle(new InviteUserCommand(otherInstitution, otherAdmin, email, Roles.OPERATOR)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Email is already registered.");
+    }
 }

@@ -9,11 +9,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 /**
@@ -35,6 +37,7 @@ class UserVisibilityIntegrationTest {
     private long otherUserId;
     private String otherEmail;
     private long ownUserId;
+    private long operatorId;
 
     @BeforeEach
     void twoInstitutions() {
@@ -47,6 +50,8 @@ class UserVisibilityIntegrationTest {
                 + "values (?, 'ADMIN', ?, 'ACTIVE') returning id", Long.class, ownInstitution, "admin@own-" + suffix + ".test");
         ownUserId = jdbc.queryForObject("insert into iam.users (institution_id, role, email, status) "
                 + "values (?, 'DRIVER', ?, 'ACTIVE') returning id", Long.class, ownInstitution, "driver@own-" + suffix + ".test");
+        operatorId = jdbc.queryForObject("insert into iam.users (institution_id, role, email, status) "
+                + "values (?, 'OPERATOR', ?, 'ACTIVE') returning id", Long.class, ownInstitution, "ops@own-" + suffix + ".test");
         otherEmail = "driver@other-" + suffix + ".test";
         otherUserId = jdbc.queryForObject("insert into iam.users (institution_id, role, email, status) "
                 + "values (?, 'DRIVER', ?, 'ACTIVE') returning id", Long.class, otherInstitution, otherEmail);
@@ -62,5 +67,13 @@ class UserVisibilityIntegrationTest {
     @Test
     void usersOfTheOwnInstitutionAreStillFound() {
         assertThat(users.handle(new GetUserByIdQuery(ownUserId))).isPresent();
+    }
+
+    @Test
+    void anOperatorStillGets403ForAnotherUserOfItsInstitution() {
+        when(currentUser.requireAuthenticatedUserId()).thenReturn(operatorId);
+
+        assertThatThrownBy(() -> users.handle(new GetUserByIdQuery(ownUserId)))
+                .isInstanceOf(AccessDeniedException.class);
     }
 }

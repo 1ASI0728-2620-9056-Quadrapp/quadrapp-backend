@@ -75,8 +75,11 @@ public class UserCommandServiceImpl implements UserCommandService {
 
         Optional<User> pendingUser = userPersistencePort.findByEmail(email.value());
 
+        // Only a pending invitation of this same institution can be renewed; any other existing
+        // account keeps answering as an already registered email.
         if (pendingUser.isPresent() &&
-                pendingUser.get().getStatus() != UserStatus.INVITED) {
+                (pendingUser.get().getStatus() != UserStatus.INVITED ||
+                        !command.institutionId().equals(pendingUser.get().getInstitutionId()))) {
             throw new IamConflictException(
                     "Email is already registered."
             );

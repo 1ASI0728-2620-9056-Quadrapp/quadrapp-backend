@@ -76,18 +76,19 @@ public class IamAuthorizationService {
             User actor,
             Long institutionId
     ) {
-        if (actor.getRole() == Roles.PLATFORM_ADMIN) {
-            return;
-        }
-
-        if (!Objects.equals(
-                actor.getInstitutionId(),
-                institutionId
-        )) {
+        if (!canAccessInstitution(actor, institutionId)) {
             throw new AccessDeniedException(
                     "Access to another institution is not allowed."
             );
         }
+    }
+
+    public boolean canAccessInstitution(
+            User actor,
+            Long institutionId
+    ) {
+        return actor.getRole() == Roles.PLATFORM_ADMIN ||
+                Objects.equals(actor.getInstitutionId(), institutionId);
     }
 
     public void requireInstitutionAdmin(
