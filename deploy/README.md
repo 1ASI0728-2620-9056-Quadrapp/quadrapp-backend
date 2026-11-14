@@ -25,6 +25,15 @@ Internet ──443──▶ caddy ──▶ backend:8080 ──▶ postgres:5432
 
 Ubuntu 24.04 (x86_64) instead of Amazon Linux 2023, because Docker publishes and updates Docker Engine and the Compose plugin for Ubuntu through its own apt repository. On Amazon Linux 2023 the Compose plugin is not packaged and must be installed and updated by hand. The AWS CLI v2 and the SSM agent, preinstalled on Amazon Linux, take one command each on Ubuntu (the SSM agent is already included in the Ubuntu AMI).
 
+## Backend image (CI)
+
+`.github/workflows/backend-image.yml` runs on every push to `main` and `develop`, on tags `v*`, and by hand (`workflow_dispatch`):
+
+1. `test` job: `./mvnw test` on Temurin 25 (Testcontainers uses the runner's Docker).
+2. `image` job, only if the tests pass: builds the `Dockerfile` for `linux/amd64` and pushes `ghcr.io/1asi0728-2620-9056-quadrapp/quadrapp-backend` with the tags `sha-<7 chars>`, the branch name (`develop`, `main`) and the git tag. It authenticates with the workflow's `GITHUB_TOKEN`; no repository secret is needed.
+
+The package is private by default. Either make it public (GitHub > organization > Packages > `quadrapp-backend` > Package settings) or log in on the instance with a `read:packages` token (step 3).
+
 ## 1. AWS resources
 
 Create these once, in the same region (for example `us-east-1`):
