@@ -12,10 +12,11 @@ AT = datetime(2026, 10, 9, 13, 5, 12, 200_000, tzinfo=timezone.utc)
 
 class ReadingPayloadTest(unittest.TestCase):
     def test_space_reading_has_the_contract_fields(self):
-        reading = build_reading("demo-ss-n1-01", "SPACE", AT, state="OCCUPIED", battery=82, signal=-71)
-        self.assertEqual(set(reading), {"eventId", "hardwareId", "kind", "state", "readingAt", "battery", "signal"})
-        self.assertEqual(reading["readingAt"], "2026-10-09T13:05:12.200Z")
-        self.assertEqual((reading["kind"], reading["state"], reading["battery"], reading["signal"]),
+        reading = build_reading("demo-ss-n1-01", "SPACE", AT, state="OCCUPIED", battery=82, rssi=-71)
+        self.assertEqual(set(reading), {"eventId", "sensorId", "kind", "state", "ts", "battery", "rssi"})
+        self.assertEqual(reading["ts"], "2026-10-09T13:05:12.200Z")
+        self.assertEqual(reading["sensorId"], "demo-ss-n1-01")
+        self.assertEqual((reading["kind"], reading["state"], reading["battery"], reading["rssi"]),
                          ("SPACE", "OCCUPIED", 82, -71))
         uuid.UUID(reading["eventId"], version=4)
 
@@ -24,6 +25,7 @@ class ReadingPayloadTest(unittest.TestCase):
         self.assertEqual(reading["direction"], "IN")
         self.assertNotIn("state", reading)
         self.assertNotIn("battery", reading)
+        self.assertNotIn("rssi", reading)
 
     def test_heartbeat_carries_neither_state_nor_direction(self):
         reading = build_reading("demo-gw-01", "HEARTBEAT", AT, battery=90)

@@ -7,21 +7,21 @@
 ## What it publishes
 
 - Topic `quadrapp/{tenantId}/{gatewayHardwareId}/readings`, MQTT 5, QoS 1, one connection per gateway.
-- One JSON reading per message:
+- One JSON reading per message, in the gateway wire format of the report (section 5.3.2, `MqttInboundListener`); Sensing translates `sensorId`, `ts` and `rssi` into the hardware id, reading time and signal of a `SensorReading`:
 
 ```json
 {
   "eventId": "8f0d5c0e-3b1a-4d7e-9a35-2f8b1c7e4a10",
-  "hardwareId": "demo-ss-n1-01",
+  "sensorId": "demo-ss-n1-01",
   "kind": "SPACE",
   "state": "OCCUPIED",
-  "readingAt": "2026-10-09T13:05:12.200Z",
+  "ts": "2026-10-09T13:05:12.200Z",
   "battery": 82,
-  "signal": -71
+  "rssi": -71
 }
 ```
 
-`kind` is `SPACE` (with `state` `FREE` or `OCCUPIED`), `PASS` (with `direction` `IN` or `OUT`) or `HEARTBEAT` (neither). `eventId` is a new UUID v4 per message; `battery` (0-100) and `signal` (RSSI, dBm) are sent with every reading.
+`kind` is `SPACE` (with `state` `FREE` or `OCCUPIED`), `PASS` (with `direction` `IN` or `OUT`) or `HEARTBEAT` (neither). `sensorId` is the hardware id of the device that read (the gateway itself for its own heartbeat). `ts` is ISO-8601 UTC with milliseconds and `Z`. `eventId` is a new UUID v4 per message; `battery` (0-100) and `rssi` (dBm) are optional in the format and the simulator sends them with every reading.
 
 ## Behaviour
 
@@ -30,7 +30,7 @@
 - **Confirmed changes:** Sensing confirms a change only when a further reading with the same state arrives after the parking lot's minimum detection time (`occupiedDebounceS` / `freedDebounceS` from the seed file). Every change is therefore sent twice: once when it happens and again 1 s after that time. A space does not change again until its confirmation was sent, and when the day ends the simulator waits for the pending confirmations before it exits.
 - **Accesses:** each arrival sends `PASS IN` and each departure `PASS OUT` on one of the access's pass sensors.
 - **Heartbeats:** the gateway and every sensor send a `HEARTBEAT` every `--heartbeat-interval` real seconds.
-- **Two clocks:** the simulated hour (which runs `--speed` times faster) only drives the curve. `readingAt` is always the real UTC time, because the backend measures the minimum detection time and the reading order on `readingAt`. Readings of one device always have increasing times.
+- **Two clocks:** the simulated hour (which runs `--speed` times faster) only drives the curve. `ts` is always the real UTC time, because the backend measures the minimum detection time and the reading order on the reading time. Readings of one device always have increasing times.
 
 ## Run
 

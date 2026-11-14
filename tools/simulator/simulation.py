@@ -8,8 +8,8 @@ also produces a PASS reading (IN/OUT) on one of the access sensors, and every de
 HEARTBEAT at a fixed interval.
 
 Two clocks are used: the simulated hour drives the day curve (it runs ``speed`` times faster),
-while ``readingAt`` is always the real UTC time, because the backend measures the minimum
-detection time and the reading order on ``readingAt``.
+while the reading time ``ts`` is always the real UTC time, because the backend measures the
+minimum detection time and the reading order on it.
 """
 
 from __future__ import annotations
@@ -107,7 +107,7 @@ class ParkingSimulation:
         sensor.last_reading_at = reading_at
         self.counters["readings"] += 1
         payload = build_reading(sensor.hardware_id, kind, reading_at,
-                                battery=round(sensor.battery), signal=self.rng.randint(-88, -55), **fields)
+                                battery=round(sensor.battery), rssi=self.rng.randint(-88, -55), **fields)
         return Message(reading_topic(self.tenant_id, sensor.gateway_hardware_id), payload)
 
     def _set_space(self, sensor: SpaceSensor, occupied: bool, now: float, wall: datetime,

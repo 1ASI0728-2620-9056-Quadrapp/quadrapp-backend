@@ -13,7 +13,7 @@ DIRECTIONS = ("IN", "OUT")
 def format_instant(moment: datetime) -> str:
     """ISO-8601 in UTC with milliseconds and a trailing Z, e.g. 2026-10-09T13:05:12.200Z."""
     if moment.tzinfo is None:
-        raise ValueError("readingAt must be timezone-aware.")
+        raise ValueError("ts must be timezone-aware.")
     utc = moment.astimezone(timezone.utc)
     return utc.strftime("%Y-%m-%dT%H:%M:%S.") + f"{utc.microsecond // 1000:03d}Z"
 
@@ -35,16 +35,16 @@ def build_reading(
     state: str | None = None,
     direction: str | None = None,
     battery: int | None = None,
-    signal: int | None = None,
+    rssi: int | None = None,
     event_id: str | None = None,
 ) -> dict:
     """Builds one reading with the same rules the backend applies to SensorReading.
 
     SPACE carries a state and no direction, PASS a direction and no state, HEARTBEAT neither.
-    battery (0-100) and signal (RSSI in dBm) are optional and left out when None.
+    battery (0-100) and rssi (dBm) are optional and left out when None.
     """
     if not hardware_id or not hardware_id.strip() or len(hardware_id.strip()) > 80:
-        raise ValueError("hardwareId is required and must not exceed 80 characters.")
+        raise ValueError("sensorId is required and must not exceed 80 characters.")
     if kind not in KINDS:
         raise ValueError(f"kind must be one of {KINDS}.")
     if kind == "SPACE" and (state not in STATES or direction is not None):
@@ -56,11 +56,13 @@ def build_reading(
     if battery is not None and not 0 <= battery <= 100:
         raise ValueError("battery must be between 0 and 100.")
 
+    # Gateway wire format of the report (5.3.2): sensorId, ts and rssi. Sensing's translator
+    # maps them to SensorReading.hardwareId, readingAt and signalRssi.
     reading = {
         "eventId": event_id or str(uuid.uuid4()),
-        "hardwareId": hardware_id.strip(),
+        "sensorId": hardware_id.strip(),
         "kind": kind,
-        "readingAt": format_instant(reading_at),
+        "ts": format_instant(reading_at),
     }
     if state is not None:
         reading["state"] = state
@@ -68,6 +70,6 @@ def build_reading(
         reading["direction"] = direction
     if battery is not None:
         reading["battery"] = int(battery)
-    if signal is not None:
-        reading["signal"] = int(signal)
+    if rssi is not None:
+        reading["rssi"] = int(rssi)
     return reading
