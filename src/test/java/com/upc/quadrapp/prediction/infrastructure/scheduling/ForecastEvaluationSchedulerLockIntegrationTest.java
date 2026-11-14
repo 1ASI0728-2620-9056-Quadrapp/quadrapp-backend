@@ -4,7 +4,10 @@ import com.upc.quadrapp.prediction.domain.services.ForecastCommandService;
 import com.upc.quadrapp.support.QuadrappIntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.scheduling.annotation.ScheduledAnnotationBeanPostProcessor;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -15,8 +18,11 @@ import static org.mockito.Mockito.verify;
 /**
  * With several backend replicas, the forecast evaluation runs in only one of them at a time:
  * the replica that takes the lock in the shared database runs it, the others skip it.
+ * Scheduling is off in this context, so a scheduled run never takes the lock or calls the
+ * service between the arrangement and the assertions of a test.
  */
 @QuadrappIntegrationTest
+@TestPropertySource(properties = {"quadrapp.scheduling.enabled=false", "quadrapp.events.retry.min-age=PT0S"})
 class ForecastEvaluationSchedulerLockIntegrationTest {
 
     private static final String LOCK = "forecast-evaluation";
@@ -29,6 +35,14 @@ class ForecastEvaluationSchedulerLockIntegrationTest {
 
     @MockitoBean
     private ForecastCommandService forecasts;
+
+    @Autowired
+    private ApplicationContext context;
+
+    @Test
+    void noJobIsScheduledInThisContext() {
+        assertThat(context.getBeanNamesForType(ScheduledAnnotationBeanPostProcessor.class)).isEmpty();
+    }
 
     @Test
     void freeLockRunsTheEvaluationAndRecordsTheLock() {
