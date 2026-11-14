@@ -9,7 +9,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.time.Clock;
-import java.time.Duration;
 
 /**
  * Wires the MQTT ingestion of gateway readings when {@code quadrapp.mqtt.enabled=true}.
@@ -20,9 +19,6 @@ import java.time.Duration;
 @EnableConfigurationProperties(MqttIngestionProperties.class)
 public class MqttInboundConfiguration {
 
-    /** Pause before the first retry of a failing reading; each further retry waits one more step. */
-    private static final Duration RETRY_BACKOFF = Duration.ofMillis(200);
-
     @Bean
     public SensorReadingTranslator sensorReadingTranslator() {
         return new SensorReadingTranslator();
@@ -31,8 +27,9 @@ public class MqttInboundConfiguration {
     @Bean
     public MqttInboundListener mqttInboundListener(
             SensorReadingTranslator translator, SensorReadingCommandService readings,
-            RejectedReadingStorePort rejected, @Qualifier("parkingSensingClock") Clock clock) {
-        return new MqttInboundListener(translator, readings, rejected, clock, RETRY_BACKOFF);
+            RejectedReadingStorePort rejected, @Qualifier("parkingSensingClock") Clock clock,
+            MqttIngestionProperties properties) {
+        return new MqttInboundListener(translator, readings, rejected, clock, properties.retryBackoff());
     }
 
     @Bean

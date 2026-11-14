@@ -31,11 +31,19 @@ import java.util.Objects;
  * discarded without retrying. Any other processing failure is retried up
  * to {@value #MAX_RETRIES} times; if it still fails, the message is stored as rejected and
  * acknowledged so it does not block the next ones. Incidents for rejected readings are registered
- * by the sensing service itself. If the rejected message cannot be stored, it is not acknowledged.
+ * by the sensing service itself.
+ * <p>
+ * A message that can be neither processed nor stored (for example while the database is down) is
+ * never left unacknowledged, because the broker stops delivering once too many messages are
+ * unacknowledged and only redelivers them after a reconnection. Instead the whole attempt is
+ * repeated on the same thread, waiting longer each round (up to {@link #MAX_OUTAGE_BACKOFF}),
+ * until the reading is processed or stored. Later messages wait meanwhile, so ingestion resumes
+ * in order as soon as the outage ends. Only {@link #stop()} ends the rounds without acknowledging.
  */
 public class MqttInboundListener {
 
     static final int MAX_RETRIES = 3;
+    static final Duration MAX_OUTAGE_BACKOFF = Duration.ofSeconds(30);
 
     private static final Logger LOGGER = LoggerFactory.getLogger(MqttInboundListener.class);
 
@@ -44,6 +52,7 @@ public class MqttInboundListener {
     private final RejectedReadingStorePort rejected;
     private final Clock clock;
     private final Duration retryBackoff;
+    private volatile boolean stopped;
 
     public MqttInboundListener(SensorReadingTranslator translator, SensorReadingCommandService readings,
                                RejectedReadingStorePort rejected, Clock clock, Duration retryBackoff) {
@@ -55,37 +64,53 @@ public class MqttInboundListener {
     }
 
     /**
-     * Processes one message and runs {@code acknowledge} once it may be confirmed to the broker.
-     * An exception means the message was neither processed nor stored, and must not be confirmed.
+     * Processes one message and runs {@code acknowledge} once it may be confirmed to the broker:
+     * after it was processed, or stored as rejected. An exception means the listener was stopped
+     * before either happened, and the message must not be confirmed.
      */
     public void onReading(String topic, byte[] payload, Runnable acknowledge) {
         Instant receivedAt = clock.instant();
         String text = payload == null ? "" : new String(payload, StandardCharsets.UTF_8);
+        for (int round = 1; ; round++) {
+            try {
+                settle(topic, payload, text, receivedAt);
+                break;
+            } catch (RuntimeException unsettled) {
+                if (stopped || Thread.currentThread().isInterrupted()) {
+                    throw unsettled;
+                }
+                Duration wait = outageBackoff(round);
+                LOGGER.error("Reading on {} could be neither processed nor stored (round {}); trying again in {} ms",
+                        topic, round, wait.toMillis(), unsettled);
+                pause(wait);
+            }
+        }
+        acknowledge.run();
+    }
 
+    /** Processes the message or stores it as rejected; throws if neither was possible. */
+    private void settle(String topic, byte[] payload, String text, Instant receivedAt) {
         GatewayReading gatewayReading;
         try {
             gatewayReading = translator.translate(topic, payload);
         } catch (MalformedReadingException malformed) {
             LOGGER.warn("Rejected malformed reading on {}: {}", topic, malformed.getMessage());
             rejected.store(topic, text, "Malformed message: " + malformed.getMessage(), receivedAt);
-            acknowledge.run();
             return;
         }
 
         RuntimeException lastFailure = null;
         for (int attempt = 1; attempt <= 1 + MAX_RETRIES; attempt++) {
             if (attempt > 1) {
-                pauseBeforeRetry(attempt - 1);
+                pause(retryBackoff.multipliedBy(attempt - 1));
             }
             try {
                 process(gatewayReading);
-                lastFailure = null;
-                break;
+                return;
             } catch (AccessDeniedException | SecurityException mismatch) {
                 LOGGER.warn("Discarded reading {} on {}: {}", gatewayReading.reading().eventId(), topic,
                         mismatch.getMessage());
                 rejected.store(topic, text, "Source mismatch: " + describe(mismatch), receivedAt);
-                acknowledge.run();
                 return;
             } catch (RuntimeException failure) {
                 lastFailure = failure;
@@ -93,11 +118,13 @@ public class MqttInboundListener {
                         topic, attempt, 1 + MAX_RETRIES, failure.toString());
             }
         }
-        if (lastFailure != null) {
-            rejected.store(topic, text, "Processing failed after " + (1 + MAX_RETRIES) + " attempts: "
-                    + describe(lastFailure), receivedAt);
-        }
-        acknowledge.run();
+        rejected.store(topic, text, "Processing failed after " + (1 + MAX_RETRIES) + " attempts: "
+                + describe(lastFailure), receivedAt);
+    }
+
+    /** Ends the outage rounds: the message being handled is left unacknowledged. */
+    public void stop() {
+        stopped = true;
     }
 
     private void process(GatewayReading gatewayReading) {
@@ -117,12 +144,20 @@ public class MqttInboundListener {
         return failure.getClass().getSimpleName() + ": " + failure.getMessage();
     }
 
-    private void pauseBeforeRetry(int retry) {
-        if (retryBackoff.isZero()) {
+    private Duration outageBackoff(int round) {
+        Duration wait = retryBackoff.multipliedBy(1L << Math.min(round, 16));
+        return wait.compareTo(MAX_OUTAGE_BACKOFF) > 0 ? MAX_OUTAGE_BACKOFF : wait;
+    }
+
+    private void pause(Duration wait) {
+        if (stopped) {
+            throw new IllegalStateException("The MQTT listener was stopped.");
+        }
+        if (wait.isZero()) {
             return;
         }
         try {
-            Thread.sleep(retryBackoff.multipliedBy(retry));
+            Thread.sleep(wait);
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Interrupted while retrying a reading.", interrupted);

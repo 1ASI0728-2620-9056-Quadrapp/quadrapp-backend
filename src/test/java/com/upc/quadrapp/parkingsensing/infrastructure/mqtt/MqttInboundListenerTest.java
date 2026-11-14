@@ -153,13 +153,53 @@ class MqttInboundListenerTest {
     }
 
     @Test
-    void doesNotAcknowledgeWhenTheRejectedMessageCannotBeStored() {
+    void keepsTryingToStoreARejectedMessageAndAcknowledgesOnceItIsStored() {
         doThrow(new DataAccessResourceFailureException("database down"))
+                .doThrow(new DataAccessResourceFailureException("database down"))
+                .doNothing()
+                .when(rejected).store(anyString(), anyString(), anyString(), any());
+
+        listener.onReading(TOPIC, bytes("not json"), acknowledge);
+
+        InOrder order = inOrder(rejected, acknowledge);
+        order.verify(rejected, times(3)).store(eq(TOPIC), eq("not json"), startsWith("Malformed message: "), eq(NOW));
+        order.verify(acknowledge).run();
+    }
+
+    @Test
+    void keepsTryingAReadingThatCanNeitherBeProcessedNorStoredAndProcessesItWhenTheOutageEnds() {
+        when(readings.handle(any()))
+                .thenThrow(new DataAccessResourceFailureException("database down"))
+                .thenThrow(new DataAccessResourceFailureException("database down"))
+                .thenThrow(new DataAccessResourceFailureException("database down"))
+                .thenThrow(new DataAccessResourceFailureException("database down"))
+                .thenReturn(new SensorReadingResult(ReadingOutcome.PENDING, null, null));
+        doThrow(new DataAccessResourceFailureException("database down"))
+                .when(rejected).store(anyString(), anyString(), anyString(), any());
+
+        listener.onReading(TOPIC, bytes(VALID), acknowledge);
+
+        InOrder order = inOrder(readings, rejected, acknowledge);
+        order.verify(readings, times(1 + MqttInboundListener.MAX_RETRIES)).handle(any());
+        order.verify(rejected).store(anyString(), anyString(), anyString(), any());
+        order.verify(readings).handle(any());
+        order.verify(acknowledge).run();
+        verify(rejected, times(1)).store(anyString(), anyString(), anyString(), any());
+    }
+
+    @Test
+    void stopsTryingWithoutAcknowledgingWhenTheListenerIsStopped() {
+        doThrow(new DataAccessResourceFailureException("database down"))
+                .doAnswer(invocation -> {
+                    listener.stop();
+                    throw new DataAccessResourceFailureException("database down");
+                })
                 .when(rejected).store(anyString(), anyString(), anyString(), any());
 
         assertThatThrownBy(() -> listener.onReading(TOPIC, bytes("not json"), acknowledge))
                 .isInstanceOf(DataAccessResourceFailureException.class);
 
+        verify(rejected, times(2)).store(anyString(), anyString(), anyString(), any());
         verify(acknowledge, never()).run();
     }
 

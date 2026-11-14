@@ -26,8 +26,10 @@ import java.util.concurrent.TimeUnit;
  * <p>
  * It subscribes with QoS 1 to the shared subscription {@code $share/<group>/quadrapp/+/+/readings},
  * so the broker delivers each reading to one replica of the group. Acknowledgements are manual:
- * a message is confirmed only after the listener processed or stored it, otherwise the broker
- * delivers it again after a reconnection. Messages arrive one at a time on the client thread.
+ * a message is confirmed only after the listener processed it or stored it as rejected. The listener
+ * never leaves a message unacknowledged while running (see {@link MqttInboundListener}), because
+ * the broker stops delivering after too many unacknowledged messages and only redelivers them on a
+ * new connection. Messages arrive one at a time on the client thread.
  * <p>
  * The client reconnects on its own after losing the connection and subscribes again on every
  * connection. If the broker is unreachable at startup, the first connection is retried in the
@@ -146,8 +148,9 @@ public class MqttReadingSubscriber implements SmartLifecycle, MqttCallback {
         try {
             listener.onReading(topic, message.getPayload(), () -> acknowledge(message));
         } catch (RuntimeException failure) {
-            // Not acknowledged: the broker delivers it again after the next reconnection.
-            LOGGER.error("Reading on {} was neither processed nor stored; it stays unacknowledged", topic, failure);
+            // Only on shutdown, or if the acknowledgement itself failed: the broker delivers the
+            // message again after the next connection (with a fixed client id).
+            LOGGER.error("Reading on {} stays unacknowledged", topic, failure);
         }
     }
 
@@ -186,6 +189,8 @@ public class MqttReadingSubscriber implements SmartLifecycle, MqttCallback {
     public synchronized void stop() {
         running = false;
         subscribed = false;
+        // A reading retried during an outage would otherwise keep the client thread busy.
+        listener.stop();
         firstConnection.shutdownNow();
         if (client == null) {
             return;
