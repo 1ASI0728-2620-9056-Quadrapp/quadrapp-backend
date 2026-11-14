@@ -23,6 +23,14 @@ public record RegisterDeviceCommand(
             );
         }
 
+        // Readings are accepted only from the sensor's own gateway (CON-15), so a sensor
+        // without one could never report.
+        if (type != DeviceType.GATEWAY && gatewayId == null) {
+            throw new IllegalArgumentException(
+                    "Sensors must be linked to a gateway."
+            );
+        }
+
         if (gatewayId != null && gatewayId <= 0) {
             throw new IllegalArgumentException(
                     "gatewayId must be positive."
