@@ -58,3 +58,11 @@ Each bounded context owns a PostgreSQL schema, with no foreign keys between sche
 ```
 
 The integration tests start the whole application against an empty PostgreSQL in Docker and check that every module migrates into its own schema.
+
+## Container image
+
+```bash
+docker build -t quadrapp-backend .
+```
+
+The `Dockerfile` builds the jar with the Maven wrapper on a JDK 25 image (tests are skipped there) and runs it on a JRE 25 image as a non-root user, with the same environment variables as [Run locally](#run-locally). The project has no Spring Boot Actuator, so the image health check requests `/v3/api-docs` and expects `200`.
