@@ -11,7 +11,7 @@ import com.upc.quadrapp.parkingsensing.domain.model.entities.DeviceIncident;
 import com.upc.quadrapp.parkingsensing.domain.model.valueobjects.*;
 import com.upc.quadrapp.parkingsensing.domain.services.SensorReadingCommandService;
 
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionOperations;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -26,6 +26,7 @@ public class SensorReadingCommandServiceImpl implements SensorReadingCommandServ
     private final ParkingConfigurationLookupPort configuration;
     private final SensorFeedStatePort feeds;
     private final SensingEventPublisherPort events;
+    private final TransactionOperations transactions;
     private final Clock clock;
 
     public SensorReadingCommandServiceImpl(
@@ -36,6 +37,7 @@ public class SensorReadingCommandServiceImpl implements SensorReadingCommandServ
             ParkingConfigurationLookupPort configuration,
             SensorFeedStatePort feeds,
             SensingEventPublisherPort events,
+            TransactionOperations transactions,
             Clock clock
     ) {
         this.trustedSources = Objects.requireNonNull(trustedSources);
@@ -45,14 +47,11 @@ public class SensorReadingCommandServiceImpl implements SensorReadingCommandServ
         this.configuration = Objects.requireNonNull(configuration);
         this.feeds = Objects.requireNonNull(feeds);
         this.events = Objects.requireNonNull(events);
+        this.transactions = Objects.requireNonNull(transactions);
         this.clock = Objects.requireNonNull(clock);
     }
 
-    /**
-     * Saves the reading and publishes its domain events in one transaction (transactional outbox).
-     */
     @Override
-    @Transactional
     public SensorReadingResult handle(
             ProcessSensorReadingCommand command
     ) {
@@ -107,6 +106,20 @@ public class SensorReadingCommandServiceImpl implements SensorReadingCommandServ
 
         validateReadingKind(device, reading);
 
+        return transactions.execute(status -> recordReading(institutionId, device, reading));
+    }
+
+    /**
+     * Saves the accepted reading and publishes its domain events in one transaction, so the
+     * events are stored in the event publication registry with it (transactional outbox).
+     * Validation runs before this transaction: an incident registered for a rejected reading
+     * is kept even though the reading fails.
+     */
+    private SensorReadingResult recordReading(
+            Long institutionId,
+            Device device,
+            SensorReading reading
+    ) {
         if (!device.recordReport(reading.readingAt())) {
             return new SensorReadingResult(
                     ReadingOutcome.OUT_OF_ORDER,

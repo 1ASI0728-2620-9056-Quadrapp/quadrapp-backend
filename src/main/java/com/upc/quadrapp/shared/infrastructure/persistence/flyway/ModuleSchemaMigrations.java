@@ -34,8 +34,8 @@ import java.util.regex.Pattern;
  * <p>
  * Moved tables keep their foreign keys, including those that point to (or come from) tables of
  * another module. Modules only share IDs, never foreign keys (CON-02), so every startup drops
- * the foreign keys that cross this schema's boundary. Fresh databases have none, and running it
- * again changes nothing.
+ * the foreign keys that cross this schema's boundary. Fresh databases have none, running it
+ * again changes nothing, and two replicas starting together do not fail on the same constraint.
  */
 public final class ModuleSchemaMigrations {
 
@@ -102,7 +102,7 @@ public final class ModuleSchemaMigrations {
                 try (ResultSet resultSet = statement.executeQuery()) {
                     while (resultSet.next()) {
                         drops.add("alter table " + quote(resultSet.getString(1)) + "." + quote(resultSet.getString(2))
-                                + " drop constraint " + quote(resultSet.getString(3)));
+                                + " drop constraint if exists " + quote(resultSet.getString(3)));
                     }
                 }
             }
