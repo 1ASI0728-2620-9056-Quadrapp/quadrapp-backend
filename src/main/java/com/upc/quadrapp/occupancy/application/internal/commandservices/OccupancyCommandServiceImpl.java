@@ -13,7 +13,6 @@ import com.upc.quadrapp.occupancy.domain.model.exceptions.OccupancyNotFoundExcep
 import com.upc.quadrapp.occupancy.domain.model.valueobjects.OccupancyEventType;
 import com.upc.quadrapp.occupancy.domain.model.valueobjects.OccupancyScopeType;
 import com.upc.quadrapp.occupancy.domain.services.OccupancyCommandService;
-import com.upc.quadrapp.parkingconfiguration.domain.model.valueobjects.SpaceStatus;
 import com.upc.quadrapp.parkingconfiguration.interfaces.acl.ParkingConfigurationContextFacade;
 import com.upc.quadrapp.parkingconfiguration.interfaces.acl.ParkingSensingConfigurationFacade;
 import org.springframework.stereotype.Service;
@@ -73,14 +72,11 @@ public class OccupancyCommandServiceImpl implements OccupancyCommandService {
         }
 
         if (spaceEvent) {
-            SpaceStatus status = eventType == OccupancyEventType.OCCUPIED
-                    ? SpaceStatus.OCCUPIED
-                    : SpaceStatus.FREE;
             parkingConfiguration.applyOccupancyDetection(
                     command.institutionId(),
                     command.parkingLotId(),
                     command.spaceId(),
-                    status,
+                    eventType == OccupancyEventType.OCCUPIED,
                     command.occurredAt(),
                     event.receivedAt()
             );
