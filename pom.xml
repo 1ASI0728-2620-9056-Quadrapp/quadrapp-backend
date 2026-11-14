@@ -30,6 +30,7 @@
         <java.version>25</java.version>
         <spring-modulith.version>2.1.2</spring-modulith.version>
         <shedlock.version>7.11.0</shedlock.version>
+        <paho-mqttv5.version>1.2.5</paho-mqttv5.version>
     </properties>
     <dependencyManagement>
         <dependencies>
@@ -154,6 +155,13 @@
             <groupId>org.springframework.modulith</groupId>
             <artifactId>spring-modulith-starter-test</artifactId>
             <scope>test</scope>
+        </dependency>
+
+        <!-- MQTT 5 client: gateway readings (shared subscription, QoS 1, manual acknowledgement) -->
+        <dependency>
+            <groupId>org.eclipse.paho</groupId>
+            <artifactId>org.eclipse.paho.mqttv5.client</artifactId>
+            <version>${paho-mqttv5.version}</version>
         </dependency>
 
         <!-- Scheduled jobs run in one replica at a time (lock in the shared schema) -->
