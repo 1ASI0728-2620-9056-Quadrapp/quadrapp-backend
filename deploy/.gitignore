@@ -1,0 +1,2 @@
+# Real secrets of the instance; only .env.example is committed.
+.env

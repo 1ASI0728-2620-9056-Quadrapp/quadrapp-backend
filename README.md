@@ -66,3 +66,7 @@ docker build -t quadrapp-backend .
 ```
 
 The `Dockerfile` builds the jar with the Maven wrapper on a JDK 25 image (tests are skipped there) and runs it on a JRE 25 image as a non-root user, with the same environment variables as [Run locally](#run-locally). The project has no Spring Boot Actuator, so the image health check requests `/v3/api-docs` and expects `200`.
+
+## Deployment
+
+The prototype runs on one EC2 instance with Docker Compose (Caddy, the backend, Mosquitto and PostgreSQL). Files, scripts and the step-by-step guide are in [`deploy/`](deploy/README.md).

@@ -1,0 +1,116 @@
+# Quadrapp prototype on one EC2 instance (decision D7b). See deploy/README.md.
+# Every ${VAR} comes from deploy/.env (copy .env.example and fill it in).
+name: quadrapp
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  # HTTPS entry point: certificates from Let's Encrypt, reverse proxy to the backend.
+  caddy:
+    image: caddy:2.11-alpine
+    restart: unless-stopped
+    ports:
+      - "${HTTPS_PORT:-443}:443"
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+      API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN in .env}
+      MQTT_DOMAIN: ${MQTT_DOMAIN:?set MQTT_DOMAIN in .env}
+      TLS_MODE: ${TLS_MODE:-acme}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    mem_limit: 128m
+    logging: *logging
+
+  # Spring Boot backend. One instance for now: the OTP store and the sensing adapters
+  # only have in-memory implementations, active in the `dev` profile (see README.md).
+  backend:
+    image: ${BACKEND_IMAGE:-ghcr.io/1asi0728-2620-9056-quadrapp/quadrapp-backend}:${BACKEND_TAG:-develop}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - "8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      # Trust X-Forwarded-* from Caddy (Docker network), so generated URLs use https.
+      SERVER_FORWARD_HEADERS_STRATEGY: native
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-quadrapp}
+      DB_USERNAME: ${POSTGRES_USER:-quadrapp}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      JWT_SECRET_BASE64: ${JWT_SECRET_BASE64:?set JWT_SECRET_BASE64 in .env}
+      OTP_HASH_PEPPER_BASE64: ${OTP_HASH_PEPPER_BASE64:?set OTP_HASH_PEPPER_BASE64 in .env}
+      INVITATION_URL_BASE: ${INVITATION_URL_BASE:?set INVITATION_URL_BASE in .env}
+      # Brevo SMTP relay. application.properties turns SMTP auth and STARTTLS off for Mailpit,
+      # so they are turned back on here.
+      MAIL_HOST: ${MAIL_HOST:-smtp-relay.brevo.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:?set MAIL_FROM in .env}
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: ${MAIL_SMTP_AUTH:-true}
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: ${MAIL_SMTP_STARTTLS:-true}
+      # MQTT ingestion (quadrapp.mqtt.* properties). The backend uses the plain listener
+      # inside the Docker network; only the gateways go through TLS on 8883.
+      QUADRAPP_MQTT_ENABLED: ${QUADRAPP_MQTT_ENABLED:-true}
+      QUADRAPP_MQTT_URL: ${QUADRAPP_MQTT_URL:-tcp://mosquitto:1883}
+      QUADRAPP_MQTT_USERNAME: ${MQTT_BACKEND_USERNAME:-backend}
+      QUADRAPP_MQTT_PASSWORD: ${MQTT_BACKEND_PASSWORD:?set MQTT_BACKEND_PASSWORD in .env}
+      QUADRAPP_MQTT_CLIENT_ID: ${QUADRAPP_MQTT_CLIENT_ID:-quadrapp-backend-1}
+      QUADRAPP_MQTT_SHARED_GROUP: ${QUADRAPP_MQTT_SHARED_GROUP:-sensing}
+    mem_limit: 1g
+    logging: *logging
+
+  # MQTT broker (decision D7a): TLS on 8883 for the gateways, plain 1883 inside the Docker network.
+  mosquitto:
+    image: eclipse-mosquitto:2.1-alpine
+    restart: unless-stopped
+    depends_on:
+      - caddy
+    entrypoint: ["/bin/sh", "/mosquitto/config/start.sh"]
+    ports:
+      - "${MQTTS_PORT:-8883}:8883"
+    environment:
+      MQTT_DOMAIN: ${MQTT_DOMAIN:?set MQTT_DOMAIN in .env}
+    volumes:
+      - ./mosquitto:/mosquitto/config:ro
+      - mosquitto_data:/mosquitto/data
+      - caddy_data:/caddy-data:ro
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "1883"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+    mem_limit: 256m
+    logging: *logging
+
+  # PostgreSQL 16 with its data on a named volume. Not published on the host.
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-quadrapp}
+      POSTGRES_USER: ${POSTGRES_USER:-quadrapp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    shm_size: 128m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    mem_limit: 768m
+    logging: *logging
+
+volumes:
+  caddy_data:
+  caddy_config:
+  mosquitto_data:
+  pgdata:

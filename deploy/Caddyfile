@@ -1,0 +1,45 @@
+# Caddy: HTTPS entry point of the Quadrapp prototype (decision D7b).
+# Values in {$...} come from the environment set in docker-compose.yml (.env).
+{
+	email {$ACME_EMAIL}
+	# Only 443 is open in the security group, so there is no HTTP -> HTTPS redirect on port 80.
+	auto_https disable_redirects
+}
+
+# Let's Encrypt with the TLS-ALPN challenge on port 443 (port 80 stays closed).
+(tls_acme) {
+	tls {
+		issuer acme {
+			disable_http_challenge
+		}
+	}
+}
+
+# Caddy's own local CA, only for testing the stack on a laptop (TLS_MODE=internal).
+(tls_internal) {
+	tls internal
+}
+
+# REST API, OpenAPI docs and the STOMP WebSocket endpoint of the backend.
+{$API_DOMAIN} {
+	import tls_{$TLS_MODE:acme}
+
+	log
+
+	@backend path /api/* /v3/api-docs /v3/api-docs/* /swagger-ui.html /swagger-ui/* /ws /ws/*
+	handle @backend {
+		# Sends X-Forwarded-For, X-Forwarded-Proto and X-Forwarded-Host; WebSocket upgrades pass through.
+		reverse_proxy backend:8080
+	}
+
+	handle {
+		respond 404
+	}
+}
+
+# Host name of the MQTT broker. This block only makes Caddy obtain and renew the certificate
+# that Mosquitto uses on port 8883 (deploy/mosquitto/start.sh copies it).
+{$MQTT_DOMAIN} {
+	import tls_{$TLS_MODE:acme}
+	respond "Quadrapp MQTT broker: connect with MQTT over TLS on port 8883." 404
+}
