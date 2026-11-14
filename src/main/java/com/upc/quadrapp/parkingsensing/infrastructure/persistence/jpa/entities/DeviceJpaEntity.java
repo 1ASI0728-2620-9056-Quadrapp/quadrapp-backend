@@ -14,7 +14,7 @@ import org.hibernate.annotations.Formula;
 import java.time.Instant;
 
 @Entity
-@Table(name = "devices", uniqueConstraints = @UniqueConstraint(name = "uk_devices_hardware_id", columnNames = "hardware_id"))
+@Table(schema = "sensing", name = "devices", uniqueConstraints = @UniqueConstraint(name = "uk_devices_hardware_id", columnNames = "hardware_id"))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -24,7 +24,7 @@ public class DeviceJpaEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Formula("(select lot.institution_id from parking_lots lot where lot.id = lot_id)")
+    @Formula("(select lot.institution_id from configuration.parking_lots lot where lot.id = lot_id)")
     @Setter(AccessLevel.NONE)
     private Long institutionId;
 

@@ -10,7 +10,7 @@ public interface SensorEventJpaRepository extends JpaRepository<SensorEventJpaEn
 
     @Modifying
     @Query(value = """
-            INSERT INTO public.sensor_events
+            INSERT INTO occupancy.sensor_events
                 (event_id, device_id, space_id, access_id, event_type, occurred_at, received_at)
             VALUES
                 (:eventId, :deviceId, :spaceId, :accessId, :eventType, :occurredAt, :receivedAt)

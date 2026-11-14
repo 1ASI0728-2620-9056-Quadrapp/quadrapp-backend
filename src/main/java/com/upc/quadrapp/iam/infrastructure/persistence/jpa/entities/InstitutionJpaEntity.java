@@ -10,7 +10,7 @@ import org.hibernate.annotations.ColumnDefault;
 import java.time.Instant;
 
 @Entity
-@Table(name = "institutions", uniqueConstraints = @UniqueConstraint(name = "uk_institutions_name", columnNames = "name"))
+@Table(schema = "iam", name = "institutions", uniqueConstraints = @UniqueConstraint(name = "uk_institutions_name", columnNames = "name"))
 @Getter
 @Setter
 @NoArgsConstructor

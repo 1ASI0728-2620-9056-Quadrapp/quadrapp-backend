@@ -10,7 +10,7 @@ import java.time.Instant;
 import java.time.LocalTime;
 
 @Entity
-@Table(name = "parking_lots", uniqueConstraints = @UniqueConstraint(name = "uk_parking_lots_institution_name", columnNames = {"institution_id", "name"}))
+@Table(schema = "configuration", name = "parking_lots", uniqueConstraints = @UniqueConstraint(name = "uk_parking_lots_institution_name", columnNames = {"institution_id", "name"}))
 @Getter
 @Setter
 @NoArgsConstructor

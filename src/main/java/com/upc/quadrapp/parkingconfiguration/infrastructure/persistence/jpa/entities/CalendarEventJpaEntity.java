@@ -11,7 +11,7 @@ import lombok.Setter;
 import java.time.Instant;
 
 @Entity
-@Table(name = "calendar_events")
+@Table(schema = "configuration", name = "calendar_events")
 @Getter
 @Setter
 @NoArgsConstructor

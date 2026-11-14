@@ -10,6 +10,7 @@ import java.time.Instant;
 
 @Entity
 @Table(
+        schema = "occupancy",
         name = "sensor_events",
         uniqueConstraints = @UniqueConstraint(
                 name = "sensor_events_event_id_key",

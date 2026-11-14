@@ -8,7 +8,7 @@ import lombok.Setter;
 import java.time.Instant;
 
 @Entity
-@Table(name = "levels", uniqueConstraints = @UniqueConstraint(name = "uk_levels_zone_name", columnNames = {"zone_id", "name"}))
+@Table(schema = "configuration", name = "levels", uniqueConstraints = @UniqueConstraint(name = "uk_levels_zone_name", columnNames = {"zone_id", "name"}))
 @Getter
 @Setter
 @NoArgsConstructor

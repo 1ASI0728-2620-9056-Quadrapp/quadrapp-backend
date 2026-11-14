@@ -13,7 +13,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 
 @Entity
-@Table(name = "spaces", uniqueConstraints = @UniqueConstraint(name = "uk_spaces_level_label", columnNames = {"level_id", "label"}))
+@Table(schema = "configuration", name = "spaces", uniqueConstraints = @UniqueConstraint(name = "uk_spaces_level_label", columnNames = {"level_id", "label"}))
 @Getter
 @Setter
 @NoArgsConstructor
