@@ -24,6 +24,10 @@ export SPRING_PROFILES_ACTIVE=dev
 
 Optional variables: `MAIL_HOST`, `MAIL_PORT` (Mailpit on `127.0.0.1:1025` by default), `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` and `INVITATION_URL_BASE`.
 
+### Demo data and simulated sensors
+
+`tools/docker-compose.dev.yml` starts Mailpit and a local Mosquitto (anonymous, development only). `tools/seed/seed.py` creates a demo institution, parking lot and devices through the API, and `tools/simulator/simulator.py` publishes their readings over MQTT. The first platform administrator has to be inserted once with SQL; see [tools/seed/README.md](tools/seed/README.md) and [tools/simulator/README.md](tools/simulator/README.md).
+
 ## Database
 
 Each bounded context owns a PostgreSQL schema, with no foreign keys between schemas:

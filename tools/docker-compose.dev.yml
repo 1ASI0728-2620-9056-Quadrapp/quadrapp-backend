@@ -1,0 +1,18 @@
+# Local services for the seed and the simulator. LOCAL DEVELOPMENT ONLY:
+# Mosquitto accepts anonymous clients (see mosquitto/mosquitto.dev.conf).
+#
+#   docker compose -f tools/docker-compose.dev.yml up -d
+#   docker compose -f tools/docker-compose.dev.yml down
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2.0.20
+    ports:
+      - "127.0.0.1:1883:1883"
+    volumes:
+      - ./mosquitto/mosquitto.dev.conf:/mosquitto/config/mosquitto.conf:ro
+
+  mailpit:
+    image: axllent/mailpit:v1.21
+    ports:
+      - "127.0.0.1:1025:1025" # SMTP used by the backend (MAIL_HOST/MAIL_PORT defaults)
+      - "127.0.0.1:8025:8025" # web UI and HTTP API read by the seed
