@@ -6,7 +6,7 @@ import java.time.LocalTime;
 public record RegisterParkingLotCommand(Long institutionId, Long createdBy, String name, String address,
         BigDecimal latitude, BigDecimal longitude, LocalTime opensAt, LocalTime closesAt, Integer saturationThresholdPct,
         Integer lowBatteryThresholdPct, Integer staleAfterSeconds, Integer flowWindowMinutes, Integer accuracyMarginPct,
-        Integer occupiedDebounceS, Integer freedDebounceS)
+        Integer occupiedDebounceS, Integer freedDebounceS, Integer lowAvailabilityPct)
 {
     public RegisterParkingLotCommand {
         if (institutionId == null || institutionId <= 0 || name == null || name.isBlank()) {

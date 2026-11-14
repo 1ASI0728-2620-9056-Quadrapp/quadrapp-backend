@@ -136,6 +136,12 @@
             <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
         </dependency>
 
+        <!-- Real-time occupancy for the app and the console (STOMP over WebSocket) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
+
         <!-- SMTP email -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

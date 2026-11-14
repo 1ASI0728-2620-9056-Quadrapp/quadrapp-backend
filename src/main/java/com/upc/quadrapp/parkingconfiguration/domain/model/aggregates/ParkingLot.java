@@ -29,6 +29,7 @@ public final class ParkingLot {
     private final int accuracyMarginPct;
     private final int occupiedDebounceS;
     private final int freedDebounceS;
+    private final int lowAvailabilityPct;
     private final int layoutVersion;
 
     private final Instant layoutPublishedAt;
@@ -54,6 +55,7 @@ public final class ParkingLot {
             int accuracyMarginPct,
             int occupiedDebounceS,
             int freedDebounceS,
+            int lowAvailabilityPct,
             int layoutVersion,
             Instant layoutPublishedAt,
             boolean active,
@@ -95,7 +97,7 @@ public final class ParkingLot {
         }
 
         // Ranges of OperatingSettings in the report: saturation 50-100 %, flow window 5-60 min,
-        // minimum detection time 3-60 s and accuracy margin 1-30 points.
+        // minimum detection time 3-60 s, accuracy margin 1-30 points and low availability 5-30 %.
         if (outside(saturationThresholdPct, 50, 100) ||
                 outside(lowBatteryThresholdPct, 1, 100) ||
                 outside(accuracyMarginPct, 1, 30) ||
@@ -103,6 +105,7 @@ public final class ParkingLot {
                 outside(flowWindowMinutes, 5, 60) ||
                 outside(occupiedDebounceS, 3, 60) ||
                 outside(freedDebounceS, 3, 60) ||
+                outside(lowAvailabilityPct, 5, 30) ||
                 layoutVersion < 0) {
             throw new IllegalArgumentException(
                     "Invalid parking lot settings."
@@ -129,6 +132,7 @@ public final class ParkingLot {
         this.accuracyMarginPct = accuracyMarginPct;
         this.occupiedDebounceS = occupiedDebounceS;
         this.freedDebounceS = freedDebounceS;
+        this.lowAvailabilityPct = lowAvailabilityPct;
 
         this.layoutVersion = layoutVersion;
         this.layoutPublishedAt = layoutPublishedAt;
@@ -157,7 +161,8 @@ public final class ParkingLot {
             int flow,
             int accuracy,
             int occupied,
-            int freed
+            int freed,
+            int lowAvailability
     ) {
         var now = Instant.now();
 
@@ -178,6 +183,7 @@ public final class ParkingLot {
                 accuracy,
                 occupied,
                 freed,
+                lowAvailability,
                 0,
                 null,
                 true,
@@ -203,6 +209,7 @@ public final class ParkingLot {
             int accuracy,
             int occupied,
             int freed,
+            int lowAvailability,
             int layoutVersion,
             Instant publishedAt,
             boolean active,
@@ -226,6 +233,7 @@ public final class ParkingLot {
                 accuracy,
                 occupied,
                 freed,
+                lowAvailability,
                 layoutVersion,
                 publishedAt,
                 active,
@@ -296,6 +304,10 @@ public final class ParkingLot {
 
     public int getFreedDebounceS() {
         return freedDebounceS;
+    }
+
+    public int getLowAvailabilityPct() {
+        return lowAvailabilityPct;
     }
 
     public int getLayoutVersion() {

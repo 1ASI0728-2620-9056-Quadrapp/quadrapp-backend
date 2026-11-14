@@ -16,4 +16,5 @@ public record RegisterParkingLotResource(@NotBlank @Size(max = 120) String name,
                                          @Min(5) @Max(60) Integer flowWindowMinutes,
                                          @Min(1) @Max(30) Integer accuracyMarginPct,
                                          @Min(3) @Max(60) Integer occupiedDebounceS,
-                                         @Min(3) @Max(60) Integer freedDebounceS) {}
+                                         @Min(3) @Max(60) Integer freedDebounceS,
+                                         @Min(5) @Max(30) Integer lowAvailabilityPct) {}

@@ -33,6 +33,7 @@ public class ParkingConfigurationJpaMapper {
                 entity.getAccuracyMarginPct(),
                 entity.getOccupiedDebounceS(),
                 entity.getFreedDebounceS(),
+                entity.getLowAvailabilityPct(),
                 entity.getLayoutVersion(),
                 entity.getLayoutPublishedAt(),
                 entity.isActive(),
@@ -72,6 +73,9 @@ public class ParkingConfigurationJpaMapper {
         );
         entity.setFreedDebounceS(
                 (short) value.getFreedDebounceS()
+        );
+        entity.setLowAvailabilityPct(
+                (short) value.getLowAvailabilityPct()
         );
 
         entity.setLayoutVersion(value.getLayoutVersion());

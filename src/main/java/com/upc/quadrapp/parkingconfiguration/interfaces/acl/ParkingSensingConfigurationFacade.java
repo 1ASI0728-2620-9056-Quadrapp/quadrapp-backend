@@ -2,14 +2,11 @@
 package com.upc.quadrapp.parkingconfiguration.interfaces.acl;
 
 import com.upc.quadrapp.parkingconfiguration.application.internal.outboundservices.persistence.*;
-import com.upc.quadrapp.parkingconfiguration.domain.model.valueobjects.SpaceStatus;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
 @Component
 @RequiredArgsConstructor
 public class ParkingSensingConfigurationFacade {
@@ -70,54 +67,6 @@ public class ParkingSensingConfigurationFacade {
             throw new AccessDeniedException(
                     "Space does not belong to this parking lot."
             );
-        }
-    }
-
-    @Transactional
-    public void applyOccupancyDetection(
-            Long institutionId,
-            Long parkingLotId,
-            Long spaceId,
-            boolean occupied,
-            Instant occurredAt,
-            Instant receivedAt
-    ) {
-        requireParkingLot(institutionId, parkingLotId);
-
-        var space = spaces.findByIdForOccupancyUpdate(spaceId)
-                .orElseThrow(
-                        () -> new IllegalArgumentException(
-                                "Space not found."
-                        )
-                );
-
-        var level = levels.findById(space.getLevelId())
-                .orElseThrow(
-                        () -> new IllegalStateException(
-                                "Space level not found."
-                        )
-                );
-
-        var zone = zones.findById(level.getZoneId())
-                .orElseThrow(
-                        () -> new IllegalStateException(
-                                "Level zone not found."
-                        )
-                );
-
-        if (!zone.getParkingLotId().equals(parkingLotId)) {
-            throw new AccessDeniedException(
-                    "Space does not belong to this parking lot."
-            );
-        }
-
-        var updatedSpace = space.applyOccupancyDetection(
-                occupied ? SpaceStatus.OCCUPIED : SpaceStatus.FREE,
-                occurredAt,
-                receivedAt
-        );
-        if (updatedSpace != space) {
-            spaces.save(updatedSpace);
         }
     }
 

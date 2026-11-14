@@ -28,6 +28,7 @@ public final class ParkingConfigurationResourceFromEntityAssembler {
                 value.getAccuracyMarginPct(),
                 value.getOccupiedDebounceS(),
                 value.getFreedDebounceS(),
+                value.getLowAvailabilityPct(),
                 value.getLayoutVersion(),
                 value.getLayoutPublishedAt(),
                 value.isActive(),

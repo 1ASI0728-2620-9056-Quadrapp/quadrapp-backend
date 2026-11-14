@@ -24,7 +24,8 @@ public final class ParkingConfigurationCommandFromResourceAssembler {
                 resource.flowWindowMinutes(),
                 resource.accuracyMarginPct(),
                 resource.occupiedDebounceS(),
-                resource.freedDebounceS()
+                resource.freedDebounceS(),
+                resource.lowAvailabilityPct()
         );
     }
 

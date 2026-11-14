@@ -3,12 +3,14 @@ package com.upc.quadrapp.parkingconfiguration.domain.model.aggregates;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Operating settings follow the ranges of OperatingSettings in the report: saturation 50-100 %,
- * flow window 5-60 min, minimum detection time 3-60 s and accuracy margin 1-30 points.
+ * flow window 5-60 min, minimum detection time 3-60 s, accuracy margin 1-30 points and
+ * low availability 5-30 %.
  */
 class ParkingLotSettingsTest {
 
@@ -31,6 +33,22 @@ class ParkingLotSettingsTest {
                 .hasMessage("Invalid parking lot settings.");
     }
 
+    @ParameterizedTest(name = "lowAvailability={0}")
+    @CsvSource({"4", "31"})
+    void aLowAvailabilityThresholdOutsideFiveToThirtyIsRejected(int lowAvailability) {
+        assertThatThrownBy(() -> ParkingLot.register(1L, 1L, "Main lot", null, null, null, null, null,
+                90, 15, 180, 15, 10, 10, 20, lowAvailability))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Invalid parking lot settings.");
+    }
+
+    @ParameterizedTest(name = "lowAvailability={0}")
+    @CsvSource({"5", "30"})
+    void aLowAvailabilityThresholdAtTheLimitsIsAccepted(int lowAvailability) {
+        assertThat(ParkingLot.register(1L, 1L, "Main lot", null, null, null, null, null,
+                90, 15, 180, 15, 10, 10, 20, lowAvailability).getLowAvailabilityPct()).isEqualTo(lowAvailability);
+    }
+
     @ParameterizedTest(name = "saturation={0} flow={1} accuracy={2} occupied={3} freed={4}")
     @CsvSource({
             "50, 5, 1, 3, 3",
@@ -43,6 +61,6 @@ class ParkingLotSettingsTest {
 
     private static ParkingLot register(int saturation, int flow, int accuracy, int occupied, int freed) {
         return ParkingLot.register(1L, 1L, "Main lot", null, null, null, null, null,
-                saturation, 15, 180, flow, accuracy, occupied, freed);
+                saturation, 15, 180, flow, accuracy, occupied, freed, 10);
     }
 }

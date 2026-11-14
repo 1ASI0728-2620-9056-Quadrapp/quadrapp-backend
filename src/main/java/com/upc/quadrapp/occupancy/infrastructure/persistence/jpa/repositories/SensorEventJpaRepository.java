@@ -25,4 +25,8 @@ public interface SensorEventJpaRepository extends JpaRepository<SensorEventJpaEn
             @Param("occurredAt") java.time.Instant occurredAt,
             @Param("receivedAt") java.time.Instant receivedAt
     );
+
+    @Modifying
+    @Query(value = "DELETE FROM occupancy.sensor_events WHERE received_at < :cutoff", nativeQuery = true)
+    int deleteReceivedBefore(@Param("cutoff") java.time.Instant cutoff);
 }

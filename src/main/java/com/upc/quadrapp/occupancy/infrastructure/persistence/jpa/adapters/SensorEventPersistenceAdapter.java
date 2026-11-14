@@ -26,4 +26,9 @@ public class SensorEventPersistenceAdapter implements SensorEventPersistencePort
                 event.receivedAt()
         ) == 1;
     }
+
+    @Override
+    public int deleteReceivedBefore(java.time.Instant cutoff) {
+        return repository.deleteReceivedBefore(cutoff);
+    }
 }

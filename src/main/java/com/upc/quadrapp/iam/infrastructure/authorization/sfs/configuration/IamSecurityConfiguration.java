@@ -68,6 +68,11 @@ public class IamSecurityConfiguration {
                                 "/actuator/health"
                         ).permitAll()
 
+                        // STOMP handshake: browsers cannot send headers on a WebSocket upgrade,
+                        // so the JWT travels in the STOMP CONNECT frame and is checked there,
+                        // and every subscription is authorized per parking lot.
+                        .requestMatchers(HttpMethod.GET, "/ws", "/ws/**").permitAll()
+
                         // Remaining endpoints require JWT
                         .anyRequest().authenticated()
                 )

@@ -2,7 +2,11 @@ package com.upc.quadrapp.occupancy.application.internal.outboundservices.persist
 
 import com.upc.quadrapp.occupancy.domain.model.entities.SensorEvent;
 
+import java.time.Instant;
+
 public interface SensorEventPersistencePort {
 
     boolean insertIfAbsent(SensorEvent event);
+
+    int deleteReceivedBefore(Instant cutoff);
 }

@@ -22,6 +22,7 @@ public class OccupancySnapshotPersistenceAdapter implements OccupancySnapshotPer
     @Override
     public OccupancySnapshot save(OccupancySnapshot snapshot) {
         OccupancySnapshotJpaEntity entity = new OccupancySnapshotJpaEntity();
+        entity.setParkingLotId(snapshot.parkingLotId());
         entity.setZoneId(snapshot.zoneId());
         entity.setTakenAt(snapshot.takenAt());
         entity.setTotalSpaces((short) snapshot.counts().totalSpaces());
@@ -29,14 +30,6 @@ public class OccupancySnapshotPersistenceAdapter implements OccupancySnapshotPer
         entity.setOccupiedCount((short) snapshot.counts().occupiedCount());
         entity.setUnknownCount((short) snapshot.counts().unknownCount());
         return toDomain(repository.save(entity));
-    }
-
-    @Override
-    public List<OccupancySnapshot> findByZoneId(Long zoneId) {
-        return repository.findByZoneIdOrderByTakenAtDesc(zoneId)
-                .stream()
-                .map(OccupancySnapshotPersistenceAdapter::toDomain)
-                .toList();
     }
 
     @Override
@@ -57,28 +50,36 @@ public class OccupancySnapshotPersistenceAdapter implements OccupancySnapshotPer
     }
 
     @Override
-    public List<OccupancySnapshot> findByParkingLotId(Long parkingLotId) {
-        return repository.findByParkingLotId(parkingLotId)
+    public List<OccupancySnapshot> findByParkingLotIdAndTakenAtBetween(
+            Long parkingLotId,
+            Instant from,
+            Instant to
+    ) {
+        return repository
+                .findByParkingLotIdAndTakenAtGreaterThanEqualAndTakenAtLessThanEqualOrderByTakenAtAscZoneIdAsc(
+                        parkingLotId,
+                        from,
+                        to
+                )
                 .stream()
                 .map(OccupancySnapshotPersistenceAdapter::toDomain)
                 .toList();
     }
 
     @Override
-    public List<OccupancySnapshot> findByParkingLotIdAndTakenAtBetween(
-            Long parkingLotId,
-            Instant from,
-            Instant to
-    ) {
-        return repository.findByParkingLotIdAndTakenAtBetween(parkingLotId, from, to)
-                .stream()
-                .map(OccupancySnapshotPersistenceAdapter::toDomain)
-                .toList();
+    public int recordAllZones(Instant takenAt) {
+        return repository.recordAllZones(takenAt);
+    }
+
+    @Override
+    public int deleteTakenBefore(Instant cutoff) {
+        return repository.deleteTakenBefore(cutoff);
     }
 
     private static OccupancySnapshot toDomain(OccupancySnapshotJpaEntity entity) {
         return new OccupancySnapshot(
                 entity.getId(),
+                entity.getParkingLotId(),
                 entity.getZoneId(),
                 entity.getTakenAt(),
                 new OccupancyCounts(

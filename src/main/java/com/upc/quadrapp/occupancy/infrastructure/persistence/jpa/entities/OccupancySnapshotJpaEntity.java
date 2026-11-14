@@ -25,6 +25,9 @@ public class OccupancySnapshotJpaEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "parking_lot_id")
+    private Long parkingLotId;
+
     @Column(name = "zone_id", nullable = false)
     private Long zoneId;
 
