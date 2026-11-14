@@ -18,6 +18,8 @@ public interface SpaceOccupancyJpaRepository extends JpaRepository<SpaceOccupanc
 
     List<SpaceOccupancyJpaEntity> findByParkingLotId(Long parkingLotId);
 
+    List<SpaceOccupancyJpaEntity> findByParkingLotIdAndActiveTrueOrderBySpaceIdAsc(Long parkingLotId);
+
     @Query(value = """
             SELECT s.zone_id AS "zoneId",
                    COUNT(*) AS "totalSpaces",

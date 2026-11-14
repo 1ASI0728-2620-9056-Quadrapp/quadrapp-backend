@@ -60,7 +60,9 @@ Each bounded context owns a PostgreSQL schema, with no foreign keys between sche
 - Low availability starts when the free spaces fall below the lot's `lowAvailabilityPct` (5-30 %, 10 % by default, set when registering the parking lot) and ends when they rise above that value plus 5 points. With no known space (all UNKNOWN) the condition does not change.
 - Published events (`occupancy.domain.model.events`): `SpaceMarkedOccupied`, `SpaceMarkedFree`, `SpaceMarkedUnknown` (with `tenantId`), `LowAvailabilityStarted` and `LowAvailabilityEnded`.
 - History (`OccupancySchedulers`, each job with ShedLock): one snapshot per zone every minute, kept 8 weeks (the window of the Prediction fallback); vehicle passages (`occupancy.vehicle_passages`) and the deduplication log of sensor events are kept 7 days. An hourly job deletes older rows.
-- REST: `GET /api/v1/parking-lots/{id}/occupancy`, `GET /api/v1/zones/{id}/occupancy`, `GET /api/v1/levels/{id}/occupancy`, `POST` and `GET /api/v1/zones/{id}/occupancy-snapshots` keep their routes and responses. A resource of another institution answers 404 with the same message as a missing one. Without `from` and `to`, the snapshot history covers the last 24 hours.
+- REST: `GET /api/v1/parking-lots/{id}/occupancy`, `GET /api/v1/zones/{id}/occupancy`, `GET /api/v1/levels/{id}/occupancy`, `POST` and `GET /api/v1/zones/{id}/occupancy-snapshots` keep their routes and responses.
+- `GET /api/v1/parking-lots/{id}/spaces/status`: one entry per active space, ordered by `spaceId`, with `spaceId`, `zoneId`, `levelId`, `status` (FREE, OCCUPIED or UNKNOWN), `unknownReason` (only when UNKNOWN), `statusSince` and `lastDetectedAt` (null until the first detection), to overlay on the layout. Any user of the lot's institution can read it, drivers included.
+- A resource of another institution answers 404 with the same message as a missing one. Without `from` and `to`, the snapshot history covers the last 24 hours.
 
 ### Real-time occupancy (STOMP)
 

@@ -34,6 +34,13 @@ public class SpaceOccupancyPersistenceAdapter implements SpaceOccupancyPersisten
     }
 
     @Override
+    public List<SpaceOccupancy> findActiveByParkingLotId(Long parkingLotId) {
+        return repository.findByParkingLotIdAndActiveTrueOrderBySpaceIdAsc(parkingLotId).stream()
+                .map(SpaceOccupancyPersistenceAdapter::toDomain)
+                .toList();
+    }
+
+    @Override
     public void saveAll(List<SpaceOccupancy> spaces) {
         if (spaces.isEmpty()) {
             return;
