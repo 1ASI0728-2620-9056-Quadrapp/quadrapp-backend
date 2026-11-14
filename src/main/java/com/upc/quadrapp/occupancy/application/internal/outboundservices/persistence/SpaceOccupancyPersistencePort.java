@@ -14,6 +14,9 @@ public interface SpaceOccupancyPersistencePort {
 
     List<SpaceOccupancy> findByParkingLotId(Long parkingLotId);
 
+    /** Active spaces of the lot ordered by ID, in one query. */
+    List<SpaceOccupancy> findActiveByParkingLotId(Long parkingLotId);
+
     /** Saves the spaces and writes them to the database at once, so later counts include them. */
     void saveAll(List<SpaceOccupancy> spaces);
 

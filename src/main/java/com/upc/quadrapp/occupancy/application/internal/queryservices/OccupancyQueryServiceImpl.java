@@ -6,6 +6,7 @@ import com.upc.quadrapp.occupancy.application.internal.outboundservices.persiste
 import com.upc.quadrapp.occupancy.application.internal.outboundservices.persistence.SpaceOccupancyPersistencePort;
 import com.upc.quadrapp.occupancy.domain.model.aggregates.LotOccupancy;
 import com.upc.quadrapp.occupancy.domain.model.aggregates.OccupancySnapshot;
+import com.upc.quadrapp.occupancy.domain.model.aggregates.SpaceOccupancy;
 import com.upc.quadrapp.occupancy.domain.model.exceptions.OccupancyNotFoundException;
 import com.upc.quadrapp.occupancy.domain.model.valueobjects.OccupancyCounts;
 import com.upc.quadrapp.occupancy.domain.model.valueobjects.OccupancyScopeType;
@@ -107,6 +108,15 @@ public class OccupancyQueryServiceImpl implements OccupancyQueryService {
     @Transactional
     public OccupancySummary getByParkingLotForInternalUse(Long parkingLotId) {
         return lotSummary(parkingLotId);
+    }
+
+    @Override
+    @Transactional
+    public List<SpaceOccupancy> getSpaceStatuses(Long parkingLotId) {
+        Long readable = layouts.readableParkingLot(parkingLotId)
+                .orElseThrow(() -> new OccupancyNotFoundException("Parking lot not found."));
+        state.fresh(readable);
+        return spaces.findActiveByParkingLotId(readable);
     }
 
     @Override

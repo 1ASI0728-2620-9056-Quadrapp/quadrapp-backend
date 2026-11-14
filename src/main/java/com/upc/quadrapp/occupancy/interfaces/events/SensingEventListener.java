@@ -12,8 +12,9 @@ import org.springframework.stereotype.Component;
  * Anticorruption layer for the events of Parking Sensing.
  * <p>
  * Each event arrives after the Sensing transaction commits, in a new transaction. Until the
- * handler completes, the publication stays incomplete in the registry and is published again
- * when the application restarts; duplicates are dropped by {@code eventId}.
+ * handler completes, the publication stays incomplete in the registry; a failed or stuck one is
+ * delivered again by the retry job (with an attempt limit), and duplicates are dropped by
+ * {@code eventId}.
  */
 @Component
 public class SensingEventListener {

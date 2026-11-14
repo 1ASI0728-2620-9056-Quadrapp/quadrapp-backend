@@ -26,7 +26,7 @@ class ModuleSchemaMigrationIntegrationTest {
     private static final Map<String, List<String>> MODULE_TABLES = Map.of(
             "iam", List.of("institution_domains", "institutions", "refresh_tokens", "users"),
             "configuration", List.of("accesses", "calendar_events", "levels", "parking_lots", "spaces", "zones"),
-            "sensing", List.of("device_incidents", "devices"),
+            "sensing", List.of("device_incidents", "devices", "rejected_readings"),
             "occupancy", List.of("lot_access_points", "lot_occupancy", "occupancy_snapshots", "sensor_events",
                     "space_occupancy", "vehicle_passages"),
             "prediction", List.of("forecasts"));

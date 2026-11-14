@@ -5,6 +5,7 @@ import com.upc.quadrapp.occupancy.domain.services.OccupancyCommandService;
 import com.upc.quadrapp.occupancy.domain.services.OccupancyQueryService;
 import com.upc.quadrapp.occupancy.interfaces.rest.resources.OccupancySnapshotResource;
 import com.upc.quadrapp.occupancy.interfaces.rest.resources.OccupancySummaryResource;
+import com.upc.quadrapp.occupancy.interfaces.rest.resources.SpaceStatusResource;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,18 @@ public class OccupancyController {
     ) {
         return ResponseEntity.ok(
                 OccupancySummaryResource.from(queries.getByParkingLot(parkingLotId))
+        );
+    }
+
+    @GetMapping("/api/v1/parking-lots/{parkingLotId}/spaces/status")
+    public ResponseEntity<List<SpaceStatusResource>> getSpaceStatuses(
+            @PathVariable Long parkingLotId
+    ) {
+        return ResponseEntity.ok(
+                queries.getSpaceStatuses(parkingLotId)
+                        .stream()
+                        .map(SpaceStatusResource::from)
+                        .toList()
         );
     }
 
