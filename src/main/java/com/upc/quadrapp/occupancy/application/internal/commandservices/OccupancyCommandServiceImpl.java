@@ -195,7 +195,8 @@ public class OccupancyCommandServiceImpl implements OccupancyCommandService {
                 lot.isLowAvailability(),
                 lot.getConsolidatedAt(),
                 new SpaceChange(space.getSpaceId(), space.getStatus(), space.getUnknownReason(),
-                        space.getStatusSince())
+                        space.getStatusSince()),
+                lot.getVersion()
         );
     }
 

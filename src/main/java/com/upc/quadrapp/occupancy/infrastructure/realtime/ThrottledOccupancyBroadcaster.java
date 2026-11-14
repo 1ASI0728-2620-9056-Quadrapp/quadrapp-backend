@@ -12,7 +12,9 @@ import org.springframework.stereotype.Component;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -24,7 +26,9 @@ import java.util.concurrent.TimeUnit;
  * Sends occupancy changes to the STOMP subscribers of the parking lot, at most one message per
  * zone per second (DD-04). A change of a quiet zone goes out at once; changes that arrive within
  * the same second, as when a gateway replays its buffer, are merged and only the last state of
- * the zone (with every space that changed) is sent when the second ends.
+ * the zone (with every space that changed) is sent when the second ends. Each change is sent after
+ * its own commit, so they may arrive out of order: the zone counts always come from the newest
+ * change (highest lot version), and a space never goes back to an older state.
  * <p>
  * The broker is in memory: each replica delivers the changes it processed to its own clients.
  */
@@ -75,14 +79,22 @@ public class ThrottledOccupancyBroadcaster implements OccupancyRealtimePort {
         ZoneWindow window = windows.computeIfAbsent(key, ignored -> new ZoneWindow());
         OccupancyRealtimeMessage immediate = null;
         synchronized (window) {
+            if (window.latest == null || change.lotVersion() > window.latest.lotVersion()) {
+                window.latest = change;
+            }
+            Long spaceId = change.space().spaceId();
+            Long spaceVersion = window.spaceVersions.get(spaceId);
+            if (spaceVersion != null && spaceVersion >= change.lotVersion()) {
+                return;
+            }
+            window.spaceVersions.put(spaceId, change.lotVersion());
             Instant now = clock.instant();
             boolean quiet = window.lastSentAt == null || !now.isBefore(window.lastSentAt.plus(WINDOW));
-            if (window.pending == null && quiet) {
+            if (window.pendingSpaces.isEmpty() && quiet) {
                 window.lastSentAt = now;
-                immediate = OccupancyRealtimeMessage.of(change, java.util.List.of(change.space()));
+                immediate = OccupancyRealtimeMessage.of(window.latest, List.of(change.space()));
             } else {
-                window.pending = change;
-                window.pendingSpaces.put(change.space().spaceId(), change.space());
+                window.pendingSpaces.put(spaceId, change.space());
                 if (!window.flushScheduled) {
                     window.flushScheduled = true;
                     Duration delay = Duration.between(now, window.lastSentAt.plus(WINDOW));
@@ -100,11 +112,10 @@ public class ThrottledOccupancyBroadcaster implements OccupancyRealtimePort {
         OccupancyRealtimeMessage message;
         synchronized (window) {
             window.flushScheduled = false;
-            if (window.pending == null) {
+            if (window.pendingSpaces.isEmpty()) {
                 return;
             }
-            message = OccupancyRealtimeMessage.of(window.pending, window.pendingSpaces.values());
-            window.pending = null;
+            message = OccupancyRealtimeMessage.of(window.latest, window.pendingSpaces.values());
             window.pendingSpaces.clear();
             window.lastSentAt = clock.instant();
         }
@@ -133,9 +144,15 @@ public class ThrottledOccupancyBroadcaster implements OccupancyRealtimePort {
         }
     }
 
+    /**
+     * Throttling state of one zone. {@code latest} is the newest state received (highest lot
+     * version), whatever the order of arrival; a space change older than the last one accepted
+     * for that space is dropped.
+     */
     private static final class ZoneWindow {
         private Instant lastSentAt;
-        private ZoneOccupancyChange pending;
+        private ZoneOccupancyChange latest;
+        private final Map<Long, Long> spaceVersions = new HashMap<>();
         private final Map<Long, SpaceChange> pendingSpaces = new LinkedHashMap<>();
         private boolean flushScheduled;
     }

@@ -25,7 +25,8 @@ import static org.mockito.Mockito.verify;
 
 /**
  * Subscribers receive a change of a quiet zone at once, but while a gateway replays its buffer
- * they receive at most the last state of each zone per second (DD-04).
+ * they receive at most the last state of each zone per second (DD-04). Changes can arrive out of
+ * order (each one is sent after its own commit), so the zone never goes back to an older state.
  */
 class ThrottledOccupancyBroadcasterTest {
 
@@ -95,6 +96,45 @@ class ThrottledOccupancyBroadcasterTest {
         assertThat(scheduled).isEmpty();
     }
 
+    @Test
+    void anOlderChangeArrivingLateNeverReplacesTheNewerStateOfTheZone() {
+        broadcaster.publish(change(1L, 100L, 9, 1));
+        clock.advance(Duration.ofMillis(100));
+        broadcaster.publish(change(1L, 100L, 3, 3));
+        broadcaster.publish(change(1L, 100L, 5, 2));
+
+        clock.advance(Duration.ofMillis(900));
+        scheduled.getFirst().run();
+
+        OccupancyRealtimeMessage flushed = sent(2).get(1);
+        assertThat(flushed.zone().freeCount()).isEqualTo(3);
+        assertThat(flushed.spaces()).singleElement().extracting(OccupancyRealtimeMessage.SpaceState::spaceId)
+                .isEqualTo(100L);
+    }
+
+    @Test
+    void anOlderChangeOfTheSameSpaceAfterTheNewerWasSentIsDropped() {
+        broadcaster.publish(change(1L, 100L, 3, 5));
+        clock.advance(Duration.ofSeconds(2));
+
+        broadcaster.publish(change(1L, 100L, 5, 4));
+
+        sent(1);
+        assertThat(scheduled).isEmpty();
+    }
+
+    @Test
+    void anOlderChangeOfAnotherSpaceIsSentWithTheNewestCountsOfTheZone() {
+        broadcaster.publish(change(1L, 100L, 3, 5));
+        clock.advance(Duration.ofSeconds(2));
+
+        broadcaster.publish(change(1L, 101L, 5, 4));
+
+        OccupancyRealtimeMessage late = sent(2).get(1);
+        assertThat(late.zone().freeCount()).isEqualTo(3);
+        assertThat(late.spaces()).extracting(OccupancyRealtimeMessage.SpaceState::spaceId).containsExactly(101L);
+    }
+
     private List<OccupancyRealtimeMessage> sent(int expected) {
         ArgumentCaptor<OccupancyRealtimeMessage> captor = ArgumentCaptor.forClass(OccupancyRealtimeMessage.class);
         verify(messaging, times(expected)).convertAndSend(eq(TOPIC), captor.capture());
@@ -102,10 +142,16 @@ class ThrottledOccupancyBroadcasterTest {
         return captor.getAllValues();
     }
 
-    private static ZoneOccupancyChange change(Long zoneId, Long spaceId, long free) {
+    private long nextVersion = 1;
+
+    private ZoneOccupancyChange change(Long zoneId, Long spaceId, long free) {
+        return change(zoneId, spaceId, free, nextVersion++);
+    }
+
+    private static ZoneOccupancyChange change(Long zoneId, Long spaceId, long free, long lotVersion) {
         return new ZoneOccupancyChange(7L, zoneId, new OccupancyCounts(10, free, 10 - free, 0),
                 new OccupancyCounts(20, free, 20 - free, 0), false, T0,
-                new SpaceChange(spaceId, SpaceStatus.OCCUPIED, null, T0));
+                new SpaceChange(spaceId, SpaceStatus.OCCUPIED, null, T0), lotVersion);
     }
 
     private static final class MutableClock extends Clock {

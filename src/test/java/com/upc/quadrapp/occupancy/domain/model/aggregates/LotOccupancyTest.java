@@ -12,8 +12,9 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Low availability starts when the free spaces fall below the lot's threshold and ends only when
- * they rise above the threshold plus 5 points (report, 5.4.1 and rule 8 of Notifications).
+ * Low availability starts when the free share of the known spaces (free over free plus occupied)
+ * falls below the lot's threshold and ends only when it rises above the threshold plus 5 points
+ * (report, 5.4.1 and rule 8 of Notifications). UNKNOWN spaces never count either way.
  */
 class LotOccupancyTest {
 
@@ -46,6 +47,35 @@ class LotOccupancyTest {
         recalculate(lot, 10);
 
         assertThat(lot.isLowAvailability()).isFalse();
+    }
+
+    @Test
+    void unknownSpacesDoNotCountAsCapacityForLowAvailability() {
+        LotOccupancy lot = lot(10);
+
+        lot.recalculate(List.of(new ZoneCount(1L, new OccupancyCounts(200, 1, 0, 199))), AT);
+
+        assertThat(lot.isLowAvailability()).isFalse();
+        assertThat(lot.pullDomainEvents()).isEmpty();
+    }
+
+    @Test
+    void theRatioIsFreeOverKnownSpaces() {
+        LotOccupancy lot = lot(10);
+
+        lot.recalculate(List.of(new ZoneCount(1L, new OccupancyCounts(100, 1, 9, 90))), AT);
+        assertThat(lot.isLowAvailability()).isFalse();
+
+        lot.recalculate(List.of(new ZoneCount(1L, new OccupancyCounts(100, 1, 10, 89))), AT);
+        assertThat(lot.isLowAvailability()).isTrue();
+        assertThat(lot.pullDomainEvents()).containsExactly(new LowAvailabilityStarted(3L, 7L, 1, 100, AT));
+
+        lot.recalculate(List.of(new ZoneCount(1L, new OccupancyCounts(100, 3, 17, 80))), AT);
+        assertThat(lot.isLowAvailability()).isTrue();
+
+        lot.recalculate(List.of(new ZoneCount(1L, new OccupancyCounts(100, 4, 17, 79))), AT);
+        assertThat(lot.isLowAvailability()).isFalse();
+        assertThat(lot.pullDomainEvents()).containsExactly(new LowAvailabilityEnded(3L, 7L, 4, 100, AT));
     }
 
     @Test
