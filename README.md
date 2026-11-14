@@ -43,7 +43,11 @@ Gateways publish with QoS 1 on `quadrapp/{institutionId}/{gatewayHardwareId}/rea
 {"eventId":"8f0d5c0e-3b1a-4d7e-9a35-2f8b1c7e4a10","sensorId":"sensor-0342","kind":"SPACE","state":"OCCUPIED","ts":"2026-10-09T13:05:12.200Z","battery":82,"rssi":-71}
 ```
 
-`kind` is `SPACE` (with `state` `FREE` or `OCCUPIED`), `PASS` (with `direction` `IN` or `OUT`) or `HEARTBEAT`; `battery` (0-100) and `rssi` are optional. A message is acknowledged only after it was processed. Malformed messages, readings whose topic does not match the device, and readings that still fail after 3 retries are stored in `sensing.rejected_readings` and acknowledged. If a reading can be neither processed nor stored (for example while the database is down), the backend keeps trying that reading, waiting longer each round up to 30 seconds, and the next readings wait behind it; ingestion resumes on its own when the database is back. A message is never left unacknowledged, because Mosquitto stops delivering after 20 unacknowledged messages and only redelivers them on a new connection.
+`kind` is `SPACE` (with `state` `FREE` or `OCCUPIED`), `PASS` (with `direction` `IN` or `OUT`) or `HEARTBEAT`; `battery` (0-100) and `rssi` are optional. A message is acknowledged only after it was processed. Malformed messages, readings whose topic does not match the device, and readings that still fail after 3 retries are stored in `sensing.rejected_readings` and acknowledged. If a reading can be neither processed nor stored (for example while the database is down), the backend keeps trying that reading, waiting longer each round up to 30 seconds, and the next readings wait behind it; ingestion resumes on its own when the database is back. A message is never left unacknowledged, because Mosquitto stops delivering after 20 unacknowledged messages and only redelivers them on a new connection. A rejection that can never be stored (a data error, not an outage) is logged and acknowledged; NUL characters in payloads are stored escaped.
+
+### Demo data and simulated sensors
+
+`tools/docker-compose.dev.yml` starts Mailpit and a local Mosquitto (anonymous, development only). `tools/seed/seed.py` creates a demo institution, parking lot and devices through the API, and `tools/simulator/simulator.py` publishes their readings over MQTT. The first platform administrator has to be inserted once with SQL; see [tools/seed/README.md](tools/seed/README.md) and [tools/simulator/README.md](tools/simulator/README.md).
 
 ## Database
 
@@ -79,3 +83,15 @@ Each bounded context owns a PostgreSQL schema, with no foreign keys between sche
 ```
 
 The integration tests start the whole application against an empty PostgreSQL in Docker and check that every module migrates into its own schema.
+
+## Container image
+
+```bash
+docker build -t quadrapp-backend .
+```
+
+The `Dockerfile` builds the jar with the Maven wrapper on a JDK 25 image (tests are skipped there) and runs it on a JRE 25 image as a non-root user, with the same environment variables as [Run locally](#run-locally). The project has no Spring Boot Actuator, so the image health check requests `/v3/api-docs` and expects `200`.
+
+## Deployment
+
+The prototype runs on one EC2 instance with Docker Compose (Caddy, the backend, Mosquitto and PostgreSQL). Files, scripts and the step-by-step guide are in [`deploy/`](deploy/README.md).
