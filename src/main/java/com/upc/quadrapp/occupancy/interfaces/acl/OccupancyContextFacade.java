@@ -1,9 +1,7 @@
 package com.upc.quadrapp.occupancy.interfaces.acl;
 
-import com.upc.quadrapp.occupancy.domain.model.commands.RecordSensorEventCommand;
 import com.upc.quadrapp.occupancy.domain.model.commands.CreateParkingLotSnapshotCommand;
 import com.upc.quadrapp.occupancy.domain.model.aggregates.OccupancySnapshot;
-import com.upc.quadrapp.occupancy.domain.model.valueobjects.OccupancyEventType;
 import com.upc.quadrapp.occupancy.domain.model.valueobjects.OccupancySummary;
 import com.upc.quadrapp.occupancy.domain.services.OccupancyCommandService;
 import com.upc.quadrapp.occupancy.domain.services.OccupancyQueryService;
@@ -24,52 +22,6 @@ public class OccupancyContextFacade {
     ) {
         this.commands = commands;
         this.queries = queries;
-    }
-
-    public boolean recordSpaceDetection(
-            Long institutionId,
-            Long parkingLotId,
-            Long spaceId,
-            Long deviceId,
-            String eventId,
-            OccupancyEventType eventType,
-            Instant occurredAt
-    ) {
-        return commands.handle(
-                new RecordSensorEventCommand(
-                        institutionId,
-                        parkingLotId,
-                        deviceId,
-                        spaceId,
-                        null,
-                        eventId,
-                        eventType,
-                        occurredAt
-                )
-        );
-    }
-
-    public boolean recordPassageDetection(
-            Long institutionId,
-            Long parkingLotId,
-            Long accessId,
-            Long deviceId,
-            String eventId,
-            OccupancyEventType eventType,
-            Instant occurredAt
-    ) {
-        return commands.handle(
-                new RecordSensorEventCommand(
-                        institutionId,
-                        parkingLotId,
-                        deviceId,
-                        null,
-                        accessId,
-                        eventId,
-                        eventType,
-                        occurredAt
-                )
-        );
     }
 
     public OccupancyView occupancyByParkingLot(Long parkingLotId) {

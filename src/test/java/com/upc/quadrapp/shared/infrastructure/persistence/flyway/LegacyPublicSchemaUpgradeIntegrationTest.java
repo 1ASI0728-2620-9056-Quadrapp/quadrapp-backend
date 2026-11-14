@@ -1,6 +1,7 @@
 package com.upc.quadrapp.shared.infrastructure.persistence.flyway;
 
 import com.upc.quadrapp.iam.infrastructure.persistence.flyway.IamSchemaMigrationConfiguration;
+import com.upc.quadrapp.parkingconfiguration.infrastructure.persistence.flyway.ParkingConfigurationSchemaMigrationConfiguration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.postgresql.ds.PGSimpleDataSource;
@@ -40,6 +41,7 @@ class LegacyPublicSchemaUpgradeIntegrationTest {
         dataSource.setPassword(POSTGRES.getPassword());
         jdbcTemplate = new JdbcTemplate(dataSource);
         jdbcTemplate.execute("drop schema if exists " + SCHEMA + " cascade");
+        jdbcTemplate.execute("drop schema if exists " + ParkingConfigurationSchemaMigrationConfiguration.SCHEMA + " cascade");
         jdbcTemplate.execute("drop schema public cascade");
         jdbcTemplate.execute("create schema public");
     }
@@ -60,6 +62,30 @@ class LegacyPublicSchemaUpgradeIntegrationTest {
         jdbcTemplate.update("insert into iam.institutions (name) values ('UNI')");
         assertThat(jdbcTemplate.queryForObject("select count(*) from iam.institutions", Integer.class))
                 .isEqualTo(2);
+    }
+
+    @Test
+    void dropsForeignKeysThatCrossModuleSchemasAndKeepsTheOthers() throws Exception {
+        createLegacyIamTablesInPublic();
+        createLegacyTablesInPublic("configuration");
+        jdbcTemplate.execute("alter table public.parking_lots add constraint fk_parking_lots_institution "
+                + "foreign key (institution_id) references public.institutions(id)");
+        jdbcTemplate.execute("create table public.push_tokens (id bigint primary key, "
+                + "user_id bigint constraint fk_push_tokens_user references public.users(id))");
+
+        ModuleSchemaMigrations.forSchema(dataSource, SCHEMA, TABLES).afterPropertiesSet();
+        ModuleSchemaMigrations.forSchema(dataSource, ParkingConfigurationSchemaMigrationConfiguration.SCHEMA,
+                ParkingConfigurationSchemaMigrationConfiguration.TABLES).afterPropertiesSet();
+
+        assertThat(jdbcTemplate.queryForList(
+                "select con.conname from pg_constraint con "
+                        + "join pg_class src on src.oid = con.conrelid "
+                        + "join pg_class dst on dst.oid = con.confrelid "
+                        + "where con.contype = 'f' and src.relnamespace <> dst.relnamespace",
+                String.class)).isEmpty();
+        assertThat(foreignKeysWithin(SCHEMA)).containsExactlyInAnyOrder(
+                "fk_institution_domains_institution", "fk_institution_domains_verifier",
+                "fk_refresh_tokens_user", "fk_users_institution", "fk_users_inviter");
     }
 
     @Test
@@ -85,9 +111,23 @@ class LegacyPublicSchemaUpgradeIntegrationTest {
     }
 
     private void createLegacyIamTablesInPublic() throws Exception {
-        String migration = new ClassPathResource("db/migration/iam/V1__create_initial_schema.sql")
+        createLegacyTablesInPublic("iam");
+    }
+
+    private void createLegacyTablesInPublic(String schema) throws Exception {
+        String migration = new ClassPathResource("db/migration/" + schema + "/V1__create_initial_schema.sql")
                 .getContentAsString(StandardCharsets.UTF_8);
-        jdbcTemplate.execute(migration.replace("iam.", "public."));
+        jdbcTemplate.execute(migration.replace(schema + ".", "public."));
+    }
+
+    private List<String> foreignKeysWithin(String schema) {
+        return jdbcTemplate.queryForList(
+                "select con.conname from pg_constraint con "
+                        + "join pg_class src on src.oid = con.conrelid "
+                        + "join pg_class dst on dst.oid = con.confrelid "
+                        + "join pg_namespace ns on ns.oid = src.relnamespace "
+                        + "where con.contype = 'f' and ns.nspname = ? and src.relnamespace = dst.relnamespace",
+                String.class, schema);
     }
 
     private List<String> tablesIn(String schema) {

@@ -78,7 +78,7 @@ public class ParkingSensingConfigurationFacade {
             Long institutionId,
             Long parkingLotId,
             Long spaceId,
-            SpaceStatus status,
+            boolean occupied,
             Instant occurredAt,
             Instant receivedAt
     ) {
@@ -112,7 +112,7 @@ public class ParkingSensingConfigurationFacade {
         }
 
         var updatedSpace = space.applyOccupancyDetection(
-                status,
+                occupied ? SpaceStatus.OCCUPIED : SpaceStatus.FREE,
                 occurredAt,
                 receivedAt
         );

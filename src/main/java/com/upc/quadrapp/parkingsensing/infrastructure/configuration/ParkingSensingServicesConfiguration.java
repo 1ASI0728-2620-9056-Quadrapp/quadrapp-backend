@@ -10,6 +10,7 @@ import com.upc.quadrapp.parkingsensing.application.internal.outboundservices.eve
 import com.upc.quadrapp.parkingsensing.domain.services.*;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.transaction.support.TransactionOperations;
 import java.time.Clock;
 
 @Configuration
@@ -52,8 +53,8 @@ public class ParkingSensingServicesConfiguration {
             TrustedReadingSourcePort trustedSources, ReadingProcessingPort processing,
             DevicePersistencePort devices, DeviceIncidentPersistencePort incidents,
             ParkingConfigurationLookupPort configuration, SensorFeedStatePort feeds,
-            OccupancyDetectionPublisherPort occupancy, Clock clock) {
+            SensingEventPublisherPort events, TransactionOperations transactions, Clock clock) {
         return new SensorReadingCommandServiceImpl(trustedSources, processing, devices,
-                incidents, configuration, feeds, occupancy, clock);
+                incidents, configuration, feeds, events, transactions, clock);
     }
 }

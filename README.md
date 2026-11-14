@@ -35,13 +35,21 @@ Each bounded context owns a PostgreSQL schema, with no foreign keys between sche
 | Parking Sensing | `sensing` | `src/main/resources/db/migration/sensing` |
 | Occupancy | `occupancy` | `src/main/resources/db/migration/occupancy` |
 | Prediction | `prediction` | `src/main/resources/db/migration/prediction` |
+| Shared infrastructure (event publication registry, ShedLock) | `shared` | `src/main/resources/db/migration/shared` |
 
 - Tables are created only by Flyway. Every module runs its own migration and keeps its own `flyway_schema_history` inside its schema (`ModuleSchemaMigrations`).
 - Hibernate runs with `ddl-auto=validate`: it checks the JPA mappings against the migrated schema and never changes it.
 - To change a table, add a new file `V<n>__<description>.sql` to the module's folder. Never edit a migration that was already applied.
 - Each JPA entity declares its module schema in `@Table(schema = "...")`, and native SQL names the schema of every table it uses, because Hibernate validation does not check native queries.
-- Upgrade path: a database created before module schemas keeps its tables in `public`. On startup they are moved, with their data, into the module schema and Flyway baselines it at version 1. If only some of a module's tables exist in `public`, or they exist in both schemas, the application refuses to start and names the tables.
+- Upgrade path: a database created before module schemas keeps its tables in `public`. On startup they are moved, with their data, into the module schema and Flyway baselines it at version 1. If only some of a module's tables exist in `public`, or they exist in both schemas, the application refuses to start and names the tables. Every startup also drops any foreign key between a module schema and another schema (CON-02), so a database created with an old hand-written script ends with none.
 - A new module adds its schema folder and a `FlywayMigrationInitializer` bean built with `ModuleSchemaMigrations.forSchema(...)`.
+
+## Modules and events
+
+- Module boundaries are checked by Spring Modulith (`ModularityTest`, `ApplicationModules.verify()`): a module may only use another module's `interfaces.acl` facade and its published events (`domain.model.events`). `shared` is an open module.
+- Modules publish domain events as Spring application events and consume them with `@ApplicationModuleListener`, which runs after the publishing transaction commits, in a new transaction and on another thread.
+- The JDBC event publication registry (`shared.event_publication`) stores each event in the same transaction that produced it (transactional outbox). Publications not completed when the application stops are published again on restart, so listeners must drop duplicates (for example by `eventId`).
+- The backend runs as several replicas, so every `@Scheduled` job must also carry `@SchedulerLock` (ShedLock, table `shared.shedlock`): only one replica runs each execution.
 
 ## Tests
 

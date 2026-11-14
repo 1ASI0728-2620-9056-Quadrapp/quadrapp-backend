@@ -6,7 +6,6 @@ import com.upc.quadrapp.occupancy.application.internal.outboundservices.persiste
 import com.upc.quadrapp.occupancy.application.internal.outboundservices.persistence.SensorEventPersistencePort;
 import com.upc.quadrapp.occupancy.domain.model.commands.RecordSensorEventCommand;
 import com.upc.quadrapp.occupancy.domain.model.valueobjects.OccupancyEventType;
-import com.upc.quadrapp.parkingconfiguration.domain.model.valueobjects.SpaceStatus;
 import com.upc.quadrapp.parkingconfiguration.interfaces.acl.ParkingConfigurationContextFacade;
 import com.upc.quadrapp.parkingconfiguration.interfaces.acl.ParkingSensingConfigurationFacade;
 import org.junit.jupiter.api.Test;
@@ -66,7 +65,7 @@ class OccupancyCommandServiceImplTest {
                 eq(10L),
                 eq(20L),
                 eq(30L),
-                eq(SpaceStatus.OCCUPIED),
+                eq(true),
                 eq(Instant.parse("2026-01-01T10:05:00Z")),
                 eq(Instant.parse("2026-01-01T10:05:01Z"))
         );
