@@ -95,6 +95,52 @@ public class ParkingConfigurationContextFacade {
         ));
     }
 
+    /**
+     * IDs of the parking lots in service, of every institution. Internal read for system jobs
+     * and event listeners only (for example, Prediction's forecast scheduler): it does not check
+     * the caller, so it must never back a REST endpoint directly.
+     */
+    @Transactional(readOnly = true)
+    public List<Long> activeParkingLotIds() {
+        return parkingLots.findActiveIds();
+    }
+
+    /**
+     * What Prediction needs of a parking lot: its institution, whether it is in service, its
+     * saturation threshold and the campus events that are not cancelled and overlap
+     * {@code [from, to)}, either of this lot or of the whole institution. Internal read for system
+     * jobs and event listeners only: it does not check the caller, so it must never back a REST
+     * endpoint directly.
+     */
+    @Transactional(readOnly = true)
+    public Optional<PredictionProfileView> predictionProfileOf(Long parkingLotId, Instant from, Instant to) {
+        Objects.requireNonNull(parkingLotId, "Parking lot ID is required.");
+        Objects.requireNonNull(from, "Start of prediction window is required.");
+        Objects.requireNonNull(to, "End of prediction window is required.");
+        return parkingLots.findById(parkingLotId).map(lot -> new PredictionProfileView(
+                lot.getId(),
+                lot.getInstitutionId(),
+                lot.isActive(),
+                lot.getSaturationThresholdPct(),
+                activeEventsOf(lot.getInstitutionId(), parkingLotId, from, to)
+        ));
+    }
+
+    private List<CalendarEventView> activeEventsOf(Long institutionId, Long parkingLotId, Instant from, Instant to) {
+        return calendarEvents.findOverlappingByInstitutionId(institutionId, from, to)
+                .stream()
+                .filter(event -> event.getCancelledAt() == null)
+                .filter(event -> event.getParkingLotId() == null
+                        || parkingLotId.equals(event.getParkingLotId()))
+                .map(event -> new CalendarEventView(
+                        event.getType().name(),
+                        event.getImpact().name(),
+                        event.getWindow().startAt(),
+                        event.getWindow().endAt()
+                ))
+                .toList();
+    }
+
     private static ParkingLotView view(ParkingLot lot) {
         return new ParkingLotView(lot.getId(), lot.getInstitutionId());
     }
@@ -210,6 +256,14 @@ public class ParkingConfigurationContextFacade {
             LocalTime opensAt,
             LocalTime closesAt,
             List<CalendarEventView> calendarEvents
+    ) {}
+
+    public record PredictionProfileView(
+            Long parkingLotId,
+            Long institutionId,
+            boolean active,
+            int saturationThresholdPct,
+            List<CalendarEventView> campusEvents
     ) {}
 
     public record CalendarEventView(

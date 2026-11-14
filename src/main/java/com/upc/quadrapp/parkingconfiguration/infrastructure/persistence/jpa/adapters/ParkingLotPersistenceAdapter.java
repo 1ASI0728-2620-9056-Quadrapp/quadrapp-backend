@@ -43,6 +43,11 @@ public class ParkingLotPersistenceAdapter
     }
 
     @Override
+    public List<Long> findActiveIds() {
+        return repository.findActiveIds();
+    }
+
+    @Override
     public boolean existsByInstitutionIdAndName(
             Long institutionId,
             String name

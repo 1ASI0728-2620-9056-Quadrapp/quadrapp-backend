@@ -52,6 +52,12 @@ Each bounded context owns a PostgreSQL schema, with no foreign keys between sche
 - A publication whose listener failed is delivered again every minute by `EventPublicationMaintenance` (not only on restart), up to `quadrapp.events.retry.max-attempts` deliveries (5); after that it stays FAILED and is logged. A publication left in progress by a stopped replica becomes FAILED after 10 minutes (`spring.modulith.events.staleness.processing`). Completed publications are deleted after `quadrapp.events.completed-retention` (7 days). Two replicas delivering the same event at once do not fail: the second one is dropped as a duplicate.
 - The backend runs as several replicas, so every `@Scheduled` job must also carry `@SchedulerLock` (ShedLock, table `shared.shedlock`): only one replica runs each execution. `quadrapp.scheduling.enabled=false` turns every scheduled job off (tests use it to call a job directly without a scheduled run racing it).
 
+## Parking Configuration: campus events
+
+- `POST /api/v1/calendar-events` schedules an event and `POST /api/v1/calendar-events/{id}/cancellation` cancels it (US35, scenario 3): 200 with the cancelled event (`cancelledAt` set), 409 if it was already cancelled, 404 for a missing event or one of another institution, 403 without the institution write permission. A cancelled event is not scheduled again; register a new one.
+- Published events (`parkingconfiguration.domain.model.events`), stored in the same transaction as the change: `CampusEventProvided` (campusEventId, tenantId, parkingLotId, startAt, endAt, impact) and `CampusEventCancelled` (same fields without impact). A null `parkingLotId` means every parking lot of the institution.
+- `ParkingConfigurationContextFacade.activeParkingLotIds()` and `predictionProfileOf(lotId, from, to)` are internal reads for system jobs and listeners (they do not check the caller) and never back a REST endpoint.
+
 ## Occupancy
 
 - Occupancy owns the state of every space (`occupancy.space_occupancy`: FREE, OCCUPIED or UNKNOWN with its reason) and of every parking lot (`occupancy.lot_occupancy`: counts of the active spaces and the low-availability condition). Both tables use optimistic locking (`version`), and every write locks the parking lot row first, so detections of one lot are applied one at a time.
