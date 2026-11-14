@@ -12,9 +12,10 @@ import java.util.Objects;
 
 /**
  * Availability of a parking lot, recalculated from the stored space states, and its
- * low-availability condition. The condition starts when the free spaces fall below the lot's
- * threshold and ends only when they rise above that threshold plus {@value #HYSTERESIS_POINTS}
- * points, so it does not flap with every space that is freed and taken again.
+ * low-availability condition. The condition starts when the free share of the known spaces
+ * (free over free plus occupied) falls below the lot's threshold and ends only when it rises above
+ * that threshold plus {@value #HYSTERESIS_POINTS} points, so it does not flap with every space
+ * that is freed and taken again. UNKNOWN spaces are left out: they are neither free nor taken.
  */
 public final class LotOccupancy {
 
@@ -62,8 +63,9 @@ public final class LotOccupancy {
 
     /**
      * Replaces the counts with the sum of the zones and registers {@link LowAvailabilityStarted}
-     * or {@link LowAvailabilityEnded} when the free spaces cross the threshold. Without any known
-     * space (all UNKNOWN) there is no information to decide, so the condition stays as it was.
+     * or {@link LowAvailabilityEnded} when the free share of the known spaces crosses the
+     * threshold. Without any known space (all UNKNOWN) there is no information to decide, so the
+     * condition stays as it was.
      */
     public void recalculate(List<ZoneCount> zones, Instant at) {
         Objects.requireNonNull(at);
@@ -71,13 +73,14 @@ public final class LotOccupancy {
         consolidatedAt = at;
         long capacity = counts.totalSpaces();
         long free = counts.freeCount();
-        if (capacity == 0 || free + counts.occupiedCount() == 0) {
+        long known = free + counts.occupiedCount();
+        if (known == 0) {
             return;
         }
-        if (!lowAvailability && free * 100 < (long) lowAvailabilityPct * capacity) {
+        if (!lowAvailability && free * 100 < (long) lowAvailabilityPct * known) {
             lowAvailability = true;
             domainEvents.add(new LowAvailabilityStarted(tenantId, parkingLotId, free, capacity, at));
-        } else if (lowAvailability && free * 100 > (long) (lowAvailabilityPct + HYSTERESIS_POINTS) * capacity) {
+        } else if (lowAvailability && free * 100 > (long) (lowAvailabilityPct + HYSTERESIS_POINTS) * known) {
             lowAvailability = false;
             domainEvents.add(new LowAvailabilityEnded(tenantId, parkingLotId, free, capacity, at));
         }

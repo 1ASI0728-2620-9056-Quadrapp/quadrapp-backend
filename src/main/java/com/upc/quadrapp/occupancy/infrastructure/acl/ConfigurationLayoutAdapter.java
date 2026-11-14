@@ -43,6 +43,7 @@ public class ConfigurationLayoutAdapter implements ParkingLayoutPort {
         return configuration.findReadableParkingLotOfLevel(levelId).map(ParkingLotView::id);
     }
 
+    /** Spaces of a deactivated parking lot are not in use, so every one of them is inactive. */
     private static ParkingLayout toLayout(ParkingLayoutView view) {
         List<SpacePlacement> spaces = view.zones().stream()
                 .flatMap(zone -> zone.levels().stream()
@@ -51,7 +52,7 @@ public class ConfigurationLayoutAdapter implements ParkingLayoutPort {
                                         space.spaceId(),
                                         zone.zoneId(),
                                         level.levelId(),
-                                        space.active()
+                                        view.active() && space.active()
                                 ))))
                 .toList();
         return new ParkingLayout(
