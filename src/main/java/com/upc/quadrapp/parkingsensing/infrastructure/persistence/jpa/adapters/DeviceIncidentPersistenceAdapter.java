@@ -1,5 +1,6 @@
 package com.upc.quadrapp.parkingsensing.infrastructure.persistence.jpa.adapters;
 
+import com.upc.quadrapp.parkingsensing.domain.model.valueobjects.IncidentType;
 import com.upc.quadrapp.parkingsensing.application.internal.outboundservices.persistence.DeviceIncidentPersistencePort;
 import com.upc.quadrapp.parkingsensing.domain.model.entities.DeviceIncident;
 
@@ -76,5 +77,10 @@ public class DeviceIncidentPersistenceAdapter implements DeviceIncidentPersisten
         return result.stream()
                 .map(mapper::toDomain)
                 .toList();
+    }
+
+    @Override
+    public boolean existsOpen(Long deviceId, IncidentType type) {
+        return repository.existsByDeviceIdAndTypeAndResolvedAtIsNull(deviceId, type);
     }
 }
