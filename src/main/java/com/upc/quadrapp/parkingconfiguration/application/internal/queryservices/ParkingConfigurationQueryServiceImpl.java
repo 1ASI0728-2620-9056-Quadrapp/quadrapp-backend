@@ -1,5 +1,6 @@
 package com.upc.quadrapp.parkingconfiguration.application.internal.queryservices;
 
+import com.upc.quadrapp.parkingconfiguration.domain.model.exceptions.ParkingConfigurationNotFoundException;
 import com.upc.quadrapp.parkingconfiguration.application.internal.outboundservices.authorization.ParkingConfigurationAuthorizationPort;
 import com.upc.quadrapp.parkingconfiguration.application.internal.outboundservices.persistence.*;
 
@@ -117,7 +118,7 @@ public final class ParkingConfigurationQueryServiceImpl
         Level level = levels.findById(
                 query.levelId()
         ).orElseThrow(
-                () -> new IllegalArgumentException(
+                () -> new ParkingConfigurationNotFoundException(
                         "Level not found."
                 )
         );
@@ -161,7 +162,7 @@ public final class ParkingConfigurationQueryServiceImpl
 
         return lots.findById(id)
                 .orElseThrow(
-                        () -> new IllegalArgumentException(
+                        () -> new ParkingConfigurationNotFoundException(
                                 "Parking lot not found."
                         )
                 );
@@ -171,7 +172,7 @@ public final class ParkingConfigurationQueryServiceImpl
 
         return zones.findById(id)
                 .orElseThrow(
-                        () -> new IllegalArgumentException(
+                        () -> new ParkingConfigurationNotFoundException(
                                 "Zone not found."
                         )
                 );

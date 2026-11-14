@@ -1,6 +1,7 @@
 
 package com.upc.quadrapp.parkingconfiguration.interfaces.rest;
 
+import com.upc.quadrapp.parkingconfiguration.domain.model.exceptions.ParkingConfigurationNotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +21,16 @@ public class ParkingConfigurationExceptionHandler {
             int status,
             String message
     ) {}
+
+    @ExceptionHandler(ParkingConfigurationNotFoundException.class)
+    public ResponseEntity<ApiError> notFound(
+            ParkingConfigurationNotFoundException exception
+    ) {
+        return error(
+                HttpStatus.NOT_FOUND,
+                exception.getMessage()
+        );
+    }
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiError> invalidArgument(
