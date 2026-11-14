@@ -18,14 +18,12 @@ public class InMemorySensorFeedStateAdapter implements SensorFeedStatePort {
     public SensorReadingResult accept(Long deviceId, int minimumDetectionSeconds, SensorReading reading) {
         AtomicReference<SensorReadingResult> result = new AtomicReference<>();
         feeds.compute(deviceId, (id, current) -> {
+            // The feed keeps its confirmed state across readings; each transition carries the
+            // minimum time of the state it moves to (see SensorFeed.accept).
             SensorFeed feed = current == null
-                    ? SensorFeed.open(id, minimumDetectionSeconds)
+                    ? SensorFeed.open(id)
                     : current;
-            if (feed.getMinimumDetectionSeconds() != minimumDetectionSeconds) {
-                // Do not apply a new threshold to an old pending transition.
-                feed = SensorFeed.open(id, minimumDetectionSeconds);
-            }
-            result.set(feed.accept(reading));
+            result.set(feed.accept(reading, minimumDetectionSeconds));
             return feed;
         });
         return result.get();

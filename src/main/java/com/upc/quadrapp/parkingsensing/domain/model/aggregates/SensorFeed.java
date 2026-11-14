@@ -6,43 +6,53 @@ import java.util.Objects;
 
 public final class SensorFeed {
     private final Long deviceId;
-    private final int minimumDetectionSeconds;
     private SensorState confirmedState;
     private SensorState pendingState;
     private Instant pendingSince;
+    /** Minimum detection time of the pending transition, fixed when it started. */
+    private Integer pendingMinimumSeconds;
     private Instant lastReadingAt;
     private boolean active;
 
-    private SensorFeed(Long deviceId, int minimumDetectionSeconds,
-                       SensorState confirmedState, SensorState pendingState,
-                       Instant pendingSince, Instant lastReadingAt, boolean active) {
+    private SensorFeed(Long deviceId, SensorState confirmedState, SensorState pendingState,
+                       Instant pendingSince, Integer pendingMinimumSeconds,
+                       Instant lastReadingAt, boolean active) {
         if (deviceId == null || deviceId <= 0) throw new IllegalArgumentException("deviceId must be positive.");
-        if (minimumDetectionSeconds < 1) throw new IllegalArgumentException("minimumDetectionSeconds must be positive.");
-        if ((pendingState == null) != (pendingSince == null)) {
-            throw new IllegalArgumentException("Pending state and timestamp must be present together.");
+        if ((pendingState == null) != (pendingSince == null)
+                || (pendingState == null) != (pendingMinimumSeconds == null)) {
+            throw new IllegalArgumentException("Pending state, timestamp and minimum time must be present together.");
+        }
+        if (pendingMinimumSeconds != null && pendingMinimumSeconds < 1) {
+            throw new IllegalArgumentException("Minimum detection time must be positive.");
         }
         this.deviceId = deviceId;
-        this.minimumDetectionSeconds = minimumDetectionSeconds;
         this.confirmedState = confirmedState;
         this.pendingState = pendingState;
         this.pendingSince = pendingSince;
+        this.pendingMinimumSeconds = pendingMinimumSeconds;
         this.lastReadingAt = lastReadingAt;
         this.active = active;
     }
 
-    public static SensorFeed open(Long deviceId, int minimumDetectionSeconds) {
-        return new SensorFeed(deviceId, minimumDetectionSeconds, null, null, null, null, true);
+    public static SensorFeed open(Long deviceId) {
+        return new SensorFeed(deviceId, null, null, null, null, null, true);
     }
 
-    public static SensorFeed restore(Long deviceId, int minimumDetectionSeconds,
-                                     SensorState confirmedState, SensorState pendingState,
-                                     Instant pendingSince, Instant lastReadingAt, boolean active) {
-        return new SensorFeed(deviceId, minimumDetectionSeconds, confirmedState,
-                pendingState, pendingSince, lastReadingAt, active);
+    public static SensorFeed restore(Long deviceId, SensorState confirmedState, SensorState pendingState,
+                                     Instant pendingSince, Integer pendingMinimumSeconds,
+                                     Instant lastReadingAt, boolean active) {
+        return new SensorFeed(deviceId, confirmedState, pendingState, pendingSince,
+                pendingMinimumSeconds, lastReadingAt, active);
     }
 
-    public SensorReadingResult accept(SensorReading reading) {
+    /**
+     * Applies a reading. {@code minimumDetectionSeconds} is the minimum time of the state the
+     * reading reports (occupied and freed can differ). A pending transition keeps the time it
+     * started with, so a configuration change never applies to it halfway.
+     */
+    public SensorReadingResult accept(SensorReading reading, int minimumDetectionSeconds) {
         Objects.requireNonNull(reading, "reading is required.");
+        if (minimumDetectionSeconds < 1) throw new IllegalArgumentException("Minimum detection time must be positive.");
         if (!active) throw new IllegalStateException("Inactive sensor feed.");
         if (lastReadingAt != null && !reading.readingAt().isAfter(lastReadingAt)) {
             return new SensorReadingResult(ReadingOutcome.OUT_OF_ORDER, null, null);
@@ -59,8 +69,7 @@ public final class SensorFeed {
         SensorState state = reading.state();
         if (state == confirmedState) {
             boolean discarded = pendingState != null;
-            pendingState = null;
-            pendingSince = null;
+            clearPending();
             return new SensorReadingResult(discarded
                     ? ReadingOutcome.BRIEF_CHANGE_DISCARDED
                     : ReadingOutcome.UNCHANGED, null, null);
@@ -68,22 +77,23 @@ public final class SensorFeed {
         if (pendingState != state) {
             pendingState = state;
             pendingSince = reading.readingAt();
+            pendingMinimumSeconds = minimumDetectionSeconds;
             return new SensorReadingResult(ReadingOutcome.PENDING, null, null);
         }
-        if (!reading.readingAt().isBefore(pendingSince.plusSeconds(minimumDetectionSeconds))) {
+        if (!reading.readingAt().isBefore(pendingSince.plusSeconds(pendingMinimumSeconds))) {
             confirmedState = state;
-            pendingState = null;
-            pendingSince = null;
+            clearPending();
             return new SensorReadingResult(ReadingOutcome.CONFIRMED, state, null);
         }
         return new SensorReadingResult(ReadingOutcome.PENDING, null, null);
     }
 
     /** Never confirm from silence: a further matching reading is required. */
-    public void deactivate() { active = false; pendingState = null; pendingSince = null; }
-    public void resetConfirmation() { confirmedState = null; pendingState = null; pendingSince = null; }
+    public void deactivate() { active = false; clearPending(); }
+    public void resetConfirmation() { confirmedState = null; clearPending(); }
+    private void clearPending() { pendingState = null; pendingSince = null; pendingMinimumSeconds = null; }
     public Long getDeviceId() { return deviceId; }
-    public int getMinimumDetectionSeconds() { return minimumDetectionSeconds; }
+    public Integer getPendingMinimumSeconds() { return pendingMinimumSeconds; }
     public SensorState getConfirmedState() { return confirmedState; }
     public SensorState getPendingState() { return pendingState; }
     public Instant getPendingSince() { return pendingSince; }
