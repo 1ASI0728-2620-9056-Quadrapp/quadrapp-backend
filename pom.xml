@@ -127,11 +127,6 @@
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
             <version>3.2.0</version>
         </dependency>
-        <dependency>
-            <groupId>io.github.encryptorcode</groupId>
-            <artifactId>pluralize</artifactId>
-            <version>1.0.0</version>
-        </dependency>
 
 
         <!-- JWT: emisión y validación de tokens -->

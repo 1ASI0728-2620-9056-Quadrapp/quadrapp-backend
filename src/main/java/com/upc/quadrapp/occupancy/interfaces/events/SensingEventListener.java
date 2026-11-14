@@ -33,9 +33,7 @@ public class SensingEventListener {
                 event.spaceId(),
                 null,
                 event.eventId(),
-                event.state() == SensorStateChanged.State.OCCUPIED
-                        ? OccupancyEventType.OCCUPIED
-                        : OccupancyEventType.FREED,
+                presenceOf(event.state()),
                 event.detectedAt()
         ));
     }
@@ -49,10 +47,26 @@ public class SensingEventListener {
                 null,
                 event.accessPointId(),
                 event.eventId(),
-                event.direction() == VehiclePassageDetected.Direction.IN
-                        ? OccupancyEventType.ENTRY
-                        : OccupancyEventType.EXIT,
+                passageOf(event.direction()),
                 event.detectedAt()
         ));
+    }
+
+    // Exhaustive switches without default: a new state or direction does not compile until it
+    // is translated here, and a missing one is rejected instead of being read as FREE or OUT.
+    private static OccupancyEventType presenceOf(SensorStateChanged.State state) {
+        return switch (state) {
+            case OCCUPIED -> OccupancyEventType.OCCUPIED;
+            case FREE -> OccupancyEventType.FREED;
+            case null -> throw new IllegalArgumentException("Sensor state is required.");
+        };
+    }
+
+    private static OccupancyEventType passageOf(VehiclePassageDetected.Direction direction) {
+        return switch (direction) {
+            case IN -> OccupancyEventType.ENTRY;
+            case OUT -> OccupancyEventType.EXIT;
+            case null -> throw new IllegalArgumentException("Passage direction is required.");
+        };
     }
 }
