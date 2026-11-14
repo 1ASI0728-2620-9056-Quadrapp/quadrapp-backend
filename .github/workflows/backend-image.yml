@@ -1,0 +1,81 @@
+# Runs the test suite and publishes the backend image to GitHub Container Registry
+# (decision D7b: GitHub Actions -> GHCR -> EC2). Deploying to the instance is a manual
+# step for now; see deploy/README.md.
+name: backend-image
+
+on:
+  push:
+    branches: [main, develop]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE: ghcr.io/1asi0728-2620-9056-quadrapp/quadrapp-backend
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+
+      # The integration tests start PostgreSQL with Testcontainers on the runner's Docker.
+      - name: Test
+        run: ./mvnw --batch-mode --no-transfer-progress test
+
+  image:
+    needs: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+
+      # QEMU runs the few runtime-stage steps of the arm64 image; the jar itself is built
+      # natively on the runner (Dockerfile build stage uses $BUILDPLATFORM).
+      - uses: docker/setup-qemu-action@v4
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Tags: sha-<7 chars> for every build, the branch name (develop, main) and the git tag.
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=sha
+            type=ref,event=branch
+            type=ref,event=tag
+
+      # Multi-platform image: linux/arm64 for the EC2 instance (t4g.small, AWS Graviton) and
+      # linux/amd64 for x86_64 machines such as developer laptops.
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
