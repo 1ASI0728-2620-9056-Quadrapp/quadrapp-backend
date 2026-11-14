@@ -46,6 +46,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # QEMU runs the few runtime-stage steps of the arm64 image; the jar itself is built
+      # natively on the runner (Dockerfile build stage uses $BUILDPLATFORM).
+      - uses: docker/setup-qemu-action@v4
+
       - uses: docker/setup-buildx-action@v4
 
       - uses: docker/login-action@v4
@@ -64,11 +68,12 @@ jobs:
             type=ref,event=branch
             type=ref,event=tag
 
-      # The EC2 instance (c7i-flex.large) is x86_64, so only linux/amd64 is built.
+      # Multi-platform image: linux/arm64 for the EC2 instance (t4g.small, AWS Graviton) and
+      # linux/amd64 for x86_64 machines such as developer laptops.
       - uses: docker/build-push-action@v7
         with:
           context: .
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

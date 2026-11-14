@@ -2,7 +2,12 @@
 
 # Build stage: compile and package with the Maven wrapper on a JDK 25 image.
 # Tests are not run here; CI runs them before building the image (.github/workflows/backend-image.yml).
-FROM eclipse-temurin:25-jdk AS build
+# It runs on the platform of the machine that builds ($BUILDPLATFORM): the jar does not depend on
+# the CPU, so a multi-platform build (linux/amd64 and linux/arm64, e.g. a t4g Graviton instance)
+# compiles once natively and only the runtime stage below is assembled per target platform.
+# BuildKit sets BUILDPLATFORM; the default only serves the classic builder, which does not.
+ARG BUILDPLATFORM=linux/amd64
+FROM --platform=$BUILDPLATFORM eclipse-temurin:25-jdk AS build
 WORKDIR /workspace
 
 # Dependencies first, so they stay cached while only the sources change.

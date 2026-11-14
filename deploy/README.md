@@ -23,14 +23,14 @@ Internet ──443──▶ caddy ──▶ backend:8080 ──▶ postgres:5432
 
 ## Operating system: Ubuntu Server 24.04 LTS
 
-Ubuntu 24.04 (x86_64) instead of Amazon Linux 2023, because Docker publishes and updates Docker Engine and the Compose plugin for Ubuntu through its own apt repository. On Amazon Linux 2023 the Compose plugin is not packaged and must be installed and updated by hand. The AWS CLI v2 and the SSM agent, preinstalled on Amazon Linux, take one command each on Ubuntu (the SSM agent is already included in the Ubuntu AMI).
+Ubuntu 24.04 (arm64) instead of Amazon Linux 2023, because Docker publishes and updates Docker Engine and the Compose plugin for Ubuntu through its own apt repository. On Amazon Linux 2023 the Compose plugin is not packaged and must be installed and updated by hand. The AWS CLI v2 and the SSM agent, preinstalled on Amazon Linux, take one command each on Ubuntu (the SSM agent is already included in the Ubuntu AMI).
 
 ## Backend image (CI)
 
 `.github/workflows/backend-image.yml` runs on every push to `main` and `develop`, on tags `v*`, and by hand (`workflow_dispatch`):
 
 1. `test` job: `./mvnw test` on Temurin 25 (Testcontainers uses the runner's Docker).
-2. `image` job, only if the tests pass: builds the `Dockerfile` for `linux/amd64` and pushes `ghcr.io/1asi0728-2620-9056-quadrapp/quadrapp-backend` with the tags `sha-<7 chars>`, the branch name (`develop`, `main`) and the git tag. It authenticates with the workflow's `GITHUB_TOKEN`; no repository secret is needed.
+2. `image` job, only if the tests pass: builds the `Dockerfile` for `linux/arm64` (the t4g instance) and `linux/amd64` (x86_64 machines) and pushes them as one multi-platform image to `ghcr.io/1asi0728-2620-9056-quadrapp/quadrapp-backend` with the tags `sha-<7 chars>`, the branch name (`develop`, `main`) and the git tag. It authenticates with the workflow's `GITHUB_TOKEN`; no repository secret is needed.
 
 The package is private by default. Either make it public (GitHub > organization > Packages > `quadrapp-backend` > Package settings) or log in on the instance with a `read:packages` token (step 3).
 
@@ -40,7 +40,7 @@ Create these once, in the same region (for example `us-east-1`):
 
 | Resource | Setting |
 | --- | --- |
-| EC2 instance | `c7i-flex.large`, AMI Ubuntu Server 24.04 LTS (x86_64), gp3 root volume of 30 GB, IMDSv2 required |
+| EC2 instance | `t4g.small` (AWS Graviton, arm64, 2 vCPU, 2 GiB), AMI Ubuntu Server 24.04 LTS (arm64), gp3 root volume of 30 GB, IMDSv2 required. Decision D7b named `c7i-flex.large` (x86_64); the team chose the t4g.small instead. The memory limits in `docker-compose.yml` add up to about 1.7 GB to fit it |
 | Elastic IP | Associated with the instance, so DNS survives stop and start |
 | Security group | Inbound 443/tcp from `0.0.0.0/0` and `::/0`; 8883/tcp from `0.0.0.0/0` (or only the campus IP of the gateways); no port 22 (use Session Manager) or 22/tcp from your IP `/32` only. Port 80 stays closed: Caddy validates with the TLS-ALPN challenge on 443 |
 | IAM role of the instance | `AmazonSSMManagedInstanceCore` (Session Manager), plus an inline policy with `s3:PutObject`, `s3:GetObject` and `s3:ListBucket` on the backup bucket |
@@ -75,8 +75,12 @@ sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plug
 sudo usermod -aG docker ubuntu   # log out and in again
 
 # AWS CLI v2 (uses the instance role, no keys)
-curl -fsSL https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o /tmp/awscliv2.zip
+curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" -o /tmp/awscliv2.zip   # aarch64 on t4g
 unzip -q /tmp/awscliv2.zip -d /tmp && sudo /tmp/aws/install && rm -rf /tmp/aws /tmp/awscliv2.zip
+
+# 2 GB swap file: a safety margin for the 2 GiB of the t4g.small, not working memory
+sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 
 # Deployment files
 git clone --depth 1 --branch develop https://github.com/1ASI0728-2620-9056-Quadrapp/quadrapp-backend.git

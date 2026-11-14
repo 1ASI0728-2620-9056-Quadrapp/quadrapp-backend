@@ -64,7 +64,7 @@ services:
       QUADRAPP_MQTT_PASSWORD: ${MQTT_BACKEND_PASSWORD:?set MQTT_BACKEND_PASSWORD in .env}
       QUADRAPP_MQTT_CLIENT_ID: ${QUADRAPP_MQTT_CLIENT_ID:-quadrapp-backend-1}
       QUADRAPP_MQTT_SHARED_GROUP: ${QUADRAPP_MQTT_SHARED_GROUP:-sensing}
-    mem_limit: 1g
+    mem_limit: 896m
     logging: *logging
 
   # MQTT broker (decision D7a): TLS on 8883 for the gateways, plain 1883 inside the Docker network.
@@ -87,7 +87,7 @@ services:
       interval: 15s
       timeout: 5s
       retries: 4
-    mem_limit: 256m
+    mem_limit: 128m
     logging: *logging
 
   # PostgreSQL 16 with its data on a named volume. Not published on the host.
@@ -106,7 +106,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 6
-    mem_limit: 768m
+    mem_limit: 512m
     logging: *logging
 
 volumes:
