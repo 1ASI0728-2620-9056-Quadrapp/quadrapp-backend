@@ -11,6 +11,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
@@ -30,6 +31,11 @@ import java.util.regex.Pattern;
  * are moved into the module schema and Flyway baselines it at version 1 instead of creating
  * the tables again. A partial or duplicated set of tables stops the startup with an explicit
  * error, so data is never hidden or split silently.
+ * <p>
+ * Moved tables keep their foreign keys, including those that point to (or come from) tables of
+ * another module. Modules only share IDs, never foreign keys (CON-02), so every startup drops
+ * the foreign keys that cross this schema's boundary. Fresh databases have none, and running it
+ * again changes nothing.
  */
 public final class ModuleSchemaMigrations {
 
@@ -54,6 +60,7 @@ public final class ModuleSchemaMigrations {
                 .load();
         return new FlywayMigrationInitializer(flyway, migration -> {
             adoptLegacyTables(dataSource, schema, tables);
+            dropCrossSchemaForeignKeys(dataSource, schema);
             migration.migrate();
         });
     }
@@ -80,6 +87,36 @@ public final class ModuleSchemaMigrations {
         }
     }
 
+    static void dropCrossSchemaForeignKeys(DataSource dataSource, String schema) {
+        String query = "select src_ns.nspname, src.relname, con.conname from pg_constraint con "
+                + "join pg_class src on src.oid = con.conrelid "
+                + "join pg_namespace src_ns on src_ns.oid = src.relnamespace "
+                + "join pg_class dst on dst.oid = con.confrelid "
+                + "join pg_namespace dst_ns on dst_ns.oid = dst.relnamespace "
+                + "where con.contype = 'f' and src_ns.nspname <> dst_ns.nspname "
+                + "and ? in (src_ns.nspname, dst_ns.nspname)";
+        try (Connection connection = dataSource.getConnection()) {
+            List<String> drops = new ArrayList<>();
+            try (PreparedStatement statement = connection.prepareStatement(query)) {
+                statement.setString(1, schema);
+                try (ResultSet resultSet = statement.executeQuery()) {
+                    while (resultSet.next()) {
+                        drops.add("alter table " + quote(resultSet.getString(1)) + "." + quote(resultSet.getString(2))
+                                + " drop constraint " + quote(resultSet.getString(3)));
+                    }
+                }
+            }
+            if (drops.isEmpty()) {
+                return;
+            }
+            executeInTransaction(connection, drops);
+            LOGGER.warn("Dropped {} foreign keys crossing the {} schema boundary (CON-02)", drops.size(), schema);
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Could not drop the foreign keys that cross the " + schema + " schema",
+                    exception);
+        }
+    }
+
     private static Set<String> existingTables(Connection connection, String schema, List<String> tables)
             throws SQLException {
         String query = "select table_name from information_schema.tables "
@@ -98,12 +135,20 @@ public final class ModuleSchemaMigrations {
     }
 
     private static void moveToSchema(Connection connection, String schema, List<String> tables) throws SQLException {
+        List<String> statements = new ArrayList<>();
+        statements.add("create schema if not exists " + schema);
+        for (String table : tables) {
+            statements.add("alter table " + LEGACY_SCHEMA + "." + table + " set schema " + schema);
+        }
+        executeInTransaction(connection, statements);
+    }
+
+    private static void executeInTransaction(Connection connection, List<String> statements) throws SQLException {
         boolean autoCommit = connection.getAutoCommit();
         connection.setAutoCommit(false);
         try (Statement statement = connection.createStatement()) {
-            statement.execute("create schema if not exists " + schema);
-            for (String table : tables) {
-                statement.execute("alter table " + LEGACY_SCHEMA + "." + table + " set schema " + schema);
+            for (String sql : statements) {
+                statement.execute(sql);
             }
             connection.commit();
         } catch (SQLException exception) {
@@ -112,6 +157,10 @@ public final class ModuleSchemaMigrations {
         } finally {
             connection.setAutoCommit(autoCommit);
         }
+    }
+
+    private static String quote(String identifier) {
+        return '"' + identifier.replace("\"", "\"\"") + '"';
     }
 
     private static void requireIdentifier(String identifier) {
