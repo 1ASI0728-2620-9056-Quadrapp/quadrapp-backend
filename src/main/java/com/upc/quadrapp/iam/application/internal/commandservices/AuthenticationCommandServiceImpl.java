@@ -25,6 +25,7 @@ import com.upc.quadrapp.iam.domain.services.AuthenticationCommandService;
 import com.upc.quadrapp.iam.domain.services.AuthenticationResult;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Service;
@@ -34,7 +35,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Optional;
+import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthenticationCommandServiceImpl
@@ -163,7 +166,8 @@ public class AuthenticationCommandServiceImpl
     }
 
     @Override
-    @Transactional
+    // The family revocation of a reused token must survive the 401 it causes.
+    @Transactional(noRollbackFor = BadCredentialsException.class)
     public AuthenticationResult handle(
             RefreshSessionCommand command
     ) {
@@ -187,6 +191,19 @@ public class AuthenticationCommandServiceImpl
                         "Invalid refresh token."
                 ));
 
+        if (currentToken.getRevokedAt() != null) {
+            // A rotated or signed-out token was presented again: someone else may hold the
+            // current token of this session, so the whole family is revoked.
+            int revoked = refreshTokenPersistencePort.revokeFamily(currentToken.getFamilyId(), now);
+            if (revoked > 0) {
+                log.warn("Refresh token reuse detected for user {}: revoked {} active tokens of its session",
+                        currentToken.getUserId(), revoked);
+            }
+            throw new BadCredentialsException(
+                    "Refresh token is expired or revoked."
+            );
+        }
+
         if (!currentToken.isValidAt(now)) {
             throw new BadCredentialsException(
                     "Refresh token is expired or revoked."
@@ -205,8 +222,8 @@ public class AuthenticationCommandServiceImpl
         currentToken.revoke(now);
         refreshTokenPersistencePort.save(currentToken);
 
-        // Issue a new session.
-        return createSession(user, now);
+        // Rotate within the same session (family).
+        return createSession(user, now, currentToken.getFamilyId());
     }
 
     @Override
@@ -311,6 +328,14 @@ public class AuthenticationCommandServiceImpl
             User user,
             Instant now
     ) {
+        return createSession(user, now, UUID.randomUUID());
+    }
+
+    private AuthenticationResult createSession(
+            User user,
+            Instant now,
+            UUID familyId
+    ) {
         if (user.getId() == null) {
             throw new IllegalStateException(
                     "Cannot issue tokens for an unsaved user."
@@ -347,6 +372,7 @@ public class AuthenticationCommandServiceImpl
 
         RefreshToken refreshToken = RefreshToken.issue(
                 user.getId(),
+                familyId,
                 refreshHash,
                 now.plus(refreshExpirationDays, ChronoUnit.DAYS),
                 now
