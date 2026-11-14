@@ -7,7 +7,10 @@ import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -20,13 +23,60 @@ public class InMemoryOtpChallengeStore implements OtpChallengeStore {
 
     private final ConcurrentHashMap<String, Challenge> challenges =
             new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, List<Instant>> requests =
+            new ConcurrentHashMap<>();
 
+    /**
+     * A challenge whose {@code hash} is null ran out of attempts: it rejects every code and
+     * keeps {@code canIssueAt}, so the exhaustion does not reset the cooldown.
+     */
     private record Challenge(
             String hash,
             Instant expiresAt,
             Instant canIssueAt,
             int failures
-    ) {}
+    ) {
+        boolean locked() {
+            return hash == null;
+        }
+    }
+
+    @Override
+    public boolean registerRequest(
+            String email,
+            int maxRequests,
+            Duration window,
+            Instant now
+    ) {
+        Objects.requireNonNull(email);
+        Objects.requireNonNull(window);
+        Objects.requireNonNull(now);
+
+        if (maxRequests <= 0 || window.isNegative() || window.isZero()) {
+            throw new IllegalArgumentException(
+                    "OTP request limit must be positive."
+            );
+        }
+
+        AtomicBoolean accepted = new AtomicBoolean(false);
+        Instant windowStart = now.minus(window);
+
+        requests.compute(email, (key, previous) -> {
+            List<Instant> recent = new ArrayList<>();
+            if (previous != null) {
+                previous.stream()
+                        .filter(requestedAt -> requestedAt.isAfter(windowStart))
+                        .forEach(recent::add);
+            }
+            if (recent.size() < maxRequests) {
+                recent.add(now);
+                accepted.set(true);
+            }
+            return recent.isEmpty() ? null : List.copyOf(recent);
+        });
+
+        return accepted.get();
+    }
 
     @Override
     public boolean issue(
@@ -82,6 +132,10 @@ public class InMemoryOtpChallengeStore implements OtpChallengeStore {
 
         challenges.computeIfPresent(email, (key, previous) -> {
 
+            if (previous.locked()) {
+                return previous;
+            }
+
             if (!now.isBefore(previous.expiresAt())) {
                 return null;
             }
@@ -99,7 +153,12 @@ public class InMemoryOtpChallengeStore implements OtpChallengeStore {
             int attempts = previous.failures() + 1;
 
             if (attempts >= MAX_FAILED_ATTEMPTS) {
-                return null;
+                return new Challenge(
+                        null,
+                        previous.expiresAt(),
+                        previous.canIssueAt(),
+                        attempts
+                );
             }
 
             return new Challenge(

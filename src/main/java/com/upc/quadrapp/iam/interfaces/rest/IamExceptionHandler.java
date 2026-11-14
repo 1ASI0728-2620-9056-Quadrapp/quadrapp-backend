@@ -1,5 +1,6 @@
 package com.upc.quadrapp.iam.interfaces.rest;
 
+import com.upc.quadrapp.iam.domain.model.exceptions.OtpRequestLimitExceededException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -35,6 +36,16 @@ public class IamExceptionHandler {
     ) {
         return response(
                 HttpStatus.CONFLICT,
+                exception.getMessage()
+        );
+    }
+
+    @ExceptionHandler(OtpRequestLimitExceededException.class)
+    public ResponseEntity<Map<String, Object>> handleOtpRequestLimit(
+            OtpRequestLimitExceededException exception
+    ) {
+        return response(
+                HttpStatus.TOO_MANY_REQUESTS,
                 exception.getMessage()
         );
     }

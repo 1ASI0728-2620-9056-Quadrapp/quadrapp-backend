@@ -17,6 +17,7 @@ import com.upc.quadrapp.iam.domain.model.commands.RequestOtpCommand;
 import com.upc.quadrapp.iam.domain.model.commands.SignInCommand;
 import com.upc.quadrapp.iam.domain.model.commands.SignOutCommand;
 import com.upc.quadrapp.iam.domain.model.entities.RefreshToken;
+import com.upc.quadrapp.iam.domain.model.exceptions.OtpRequestLimitExceededException;
 import com.upc.quadrapp.iam.domain.model.valueobjects.EmailAddress;
 import com.upc.quadrapp.iam.domain.model.valueobjects.Roles;
 import com.upc.quadrapp.iam.domain.model.valueobjects.UserStatus;
@@ -29,6 +30,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Optional;
@@ -54,12 +56,30 @@ public class AuthenticationCommandServiceImpl
     @Value("${quadrapp.iam.otp-expiration-minutes:5}")
     private long otpExpirationMinutes;
 
+    @Value("${quadrapp.iam.otp-max-requests:5}")
+    private int otpMaxRequests;
+
+    @Value("${quadrapp.iam.otp-request-window-minutes:15}")
+    private long otpRequestWindowMinutes;
+
     @Value("${quadrapp.iam.refresh-expiration-days:7}")
     private long refreshExpirationDays;
 
     @Override
     public void handle(RequestOtpCommand command) {
         EmailAddress email = new EmailAddress(command.email());
+        Instant now = Instant.now();
+
+        // Counted for every email, before checking access, so a 429 does not reveal
+        // whether the email is allowed (CON-09, scenario 2).
+        if (!otpChallengeStore.registerRequest(
+                email.value(),
+                otpMaxRequests,
+                Duration.ofMinutes(otpRequestWindowMinutes),
+                now
+        )) {
+            throw new OtpRequestLimitExceededException();
+        }
 
         // Avoid revealing whether an account exists.
         if (!isEmailAllowed(email)) {
@@ -72,7 +92,6 @@ public class AuthenticationCommandServiceImpl
             );
         }
 
-        Instant now = Instant.now();
         String otpCode = otpCodeGenerator.generate();
 
         if (otpCode == null ||
