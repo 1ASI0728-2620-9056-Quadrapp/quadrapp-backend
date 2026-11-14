@@ -230,6 +230,46 @@ public class User {
         );
     }
 
+    /**
+     * Sends the invitation again with a new token and expiry, for an invitation that expired or
+     * never arrived. Only a pending invitation of the same institution can be renewed.
+     */
+    public void reissueInvitation(
+            Long institutionId,
+            Roles role,
+            String tokenHash,
+            Instant expiresAt,
+            Instant now
+    ) {
+        Objects.requireNonNull(now, "Timestamp is required.");
+
+        if (status != UserStatus.INVITED ||
+                !Objects.equals(this.institutionId, institutionId)) {
+            throw new IllegalStateException(
+                    "Email is already registered."
+            );
+        }
+
+        if (role == null || !role.canBeInvited()) {
+            throw new IllegalArgumentException(
+                    "Only administrators and operators can be invited."
+            );
+        }
+
+        validateRequiredTokenHash(tokenHash);
+
+        if (expiresAt == null || !expiresAt.isAfter(now)) {
+            throw new IllegalArgumentException(
+                    "Invitation expiration must be in the future."
+            );
+        }
+
+        this.role = role;
+        this.invitationTokenHash = tokenHash;
+        this.invitationExpiresAt = expiresAt;
+        this.updatedAt = now;
+    }
+
     public void acceptInvitation(
             String providedTokenHash,
             String fullName,

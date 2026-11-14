@@ -24,6 +24,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.time.temporal.ChronoUnit;
 
 @Service
@@ -71,7 +72,10 @@ public class UserCommandServiceImpl implements UserCommandService {
 
         EmailAddress email = new EmailAddress(command.email());
 
-        if (userPersistencePort.existsByEmail(email.value())) {
+        Optional<User> pendingUser = userPersistencePort.findByEmail(email.value());
+
+        if (pendingUser.isPresent() &&
+                pendingUser.get().getStatus() != UserStatus.INVITED) {
             throw new IllegalStateException(
                     "Email is already registered."
             );
@@ -106,15 +110,30 @@ public class UserCommandServiceImpl implements UserCommandService {
                 invitationToken
         );
 
-        User user = User.invite(
-                command.institutionId(),
-                actor.getId(),
-                email.value(),
-                command.role(),
-                invitationHash,
-                now.plus(invitationExpirationHours, ChronoUnit.HOURS),
-                now
-        );
+        Instant invitationExpiresAt =
+                now.plus(invitationExpirationHours, ChronoUnit.HOURS);
+
+        User user;
+        if (pendingUser.isPresent()) {
+            user = pendingUser.get();
+            user.reissueInvitation(
+                    command.institutionId(),
+                    command.role(),
+                    invitationHash,
+                    invitationExpiresAt,
+                    now
+            );
+        } else {
+            user = User.invite(
+                    command.institutionId(),
+                    actor.getId(),
+                    email.value(),
+                    command.role(),
+                    invitationHash,
+                    invitationExpiresAt,
+                    now
+            );
+        }
 
         User savedUser = userPersistencePort.save(user);
 
