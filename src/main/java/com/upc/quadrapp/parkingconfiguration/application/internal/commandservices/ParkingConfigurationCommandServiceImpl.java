@@ -64,7 +64,9 @@ public final class ParkingConfigurationCommandServiceImpl
                 command.occupiedDebounceS() == null
                         ? 10 : command.occupiedDebounceS(),
                 command.freedDebounceS() == null
-                        ? 20 : command.freedDebounceS()
+                        ? 20 : command.freedDebounceS(),
+                command.lowAvailabilityPct() == null
+                        ? 10 : command.lowAvailabilityPct()
         );
 
         if (lots.existsByInstitutionIdAndName(

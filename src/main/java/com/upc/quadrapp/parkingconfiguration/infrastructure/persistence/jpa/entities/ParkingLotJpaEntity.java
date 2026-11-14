@@ -65,6 +65,9 @@ public class ParkingLotJpaEntity {
     @Column(name = "freed_debounce_s", nullable = false)
     private short freedDebounceS;
 
+    @Column(name = "low_availability_pct", nullable = false)
+    private short lowAvailabilityPct;
+
     @Column(name = "layout_version", nullable = false)
     private int layoutVersion;
 
