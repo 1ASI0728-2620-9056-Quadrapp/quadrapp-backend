@@ -269,8 +269,7 @@ public class AuthenticationCommandServiceImpl
             EmailAddress email
     ) {
         return institutionDomainPersistencePort
-                .findByDomain(email.domain())
-                .filter(domain -> domain.isVerified())
+                .findVerifiedByDomain(email.domain())
                 .flatMap(domain ->
                         institutionPersistencePort
                                 .findById(domain.getInstitutionId())

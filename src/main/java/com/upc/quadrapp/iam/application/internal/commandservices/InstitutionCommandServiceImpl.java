@@ -79,8 +79,10 @@ public class InstitutionCommandServiceImpl
         InstitutionDomainName domainName =
                 new InstitutionDomainName(command.domain());
 
-        if (institutionDomainPersistencePort
-                .findByDomain(domainName.value())
+        if (institutionDomainPersistencePort.existsByInstitutionIdAndDomain(
+                institution.getId(), domainName.value())
+                || institutionDomainPersistencePort
+                .findVerifiedByDomain(domainName.value())
                 .isPresent()) {
             throw new IllegalStateException(
                     "Institution domain is already registered."
@@ -126,6 +128,17 @@ public class InstitutionCommandServiceImpl
         if (!institution.isActive()) {
             throw new IllegalStateException(
                     "Cannot verify a domain of an inactive institution."
+            );
+        }
+
+        boolean verifiedElsewhere = institutionDomainPersistencePort
+                .findVerifiedByDomain(institutionDomain.getDomain().value())
+                .filter(verified -> !verified.getId().equals(institutionDomain.getId()))
+                .isPresent();
+
+        if (verifiedElsewhere) {
+            throw new IllegalStateException(
+                    "Institution domain is already verified by another institution."
             );
         }
 

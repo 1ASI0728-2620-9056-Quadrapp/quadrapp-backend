@@ -82,13 +82,17 @@ public class UserCommandServiceImpl implements UserCommandService {
         }
 
         var institutionalDomain = institutionDomainPersistencePort
-                .findByDomain(email.domain())
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "Email domain is not registered."
-                ));
+                .findVerifiedByDomain(email.domain());
 
-        if (!institutionalDomain.isVerified() ||
-                !institutionalDomain.getInstitutionId()
+        if (institutionalDomain.isEmpty() &&
+                !institutionDomainPersistencePort.existsByDomain(email.domain())) {
+            throw new IllegalArgumentException(
+                    "Email domain is not registered."
+            );
+        }
+
+        if (institutionalDomain.isEmpty() ||
+                !institutionalDomain.get().getInstitutionId()
                         .equals(command.institutionId())) {
             throw new IllegalArgumentException(
                     "Email domain is not verified for this institution."
@@ -179,13 +183,17 @@ public class UserCommandServiceImpl implements UserCommandService {
         }
 
         var institutionalDomain = institutionDomainPersistencePort
-                .findByDomain(user.getEmail().domain())
-                .orElseThrow(() -> new IllegalStateException(
-                        "Institutional domain was not found."
-                ));
+                .findVerifiedByDomain(user.getEmail().domain());
 
-        if (!institutionalDomain.isVerified() ||
-                !institutionalDomain.getInstitutionId()
+        if (institutionalDomain.isEmpty() &&
+                !institutionDomainPersistencePort.existsByDomain(user.getEmail().domain())) {
+            throw new IllegalStateException(
+                    "Institutional domain was not found."
+            );
+        }
+
+        if (institutionalDomain.isEmpty() ||
+                !institutionalDomain.get().getInstitutionId()
                         .equals(user.getInstitutionId())) {
             throw new IllegalStateException(
                     "Institutional domain is not verified."
