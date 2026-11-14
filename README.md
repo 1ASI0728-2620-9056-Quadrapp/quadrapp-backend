@@ -24,6 +24,24 @@ export SPRING_PROFILES_ACTIVE=dev
 
 Optional variables: `MAIL_HOST`, `MAIL_PORT` (Mailpit on `127.0.0.1:1025` by default), `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` and `INVITATION_URL_BASE`.
 
+Sensor readings arrive through an MQTT 5 broker (for example Eclipse Mosquitto). Ingestion is off by default; these optional variables turn it on:
+
+| Variable | Property | Default | Meaning |
+| --- | --- | --- | --- |
+| `MQTT_ENABLED` | `quadrapp.mqtt.enabled` | `false` | Connect to the broker and receive readings |
+| `MQTT_URL` | `quadrapp.mqtt.url` | `tcp://localhost:1883` | Broker URL (`ssl://...` for TLS) |
+| `MQTT_USERNAME`, `MQTT_PASSWORD` | `quadrapp.mqtt.username`, `quadrapp.mqtt.password` | empty (anonymous) | Backend credential, subscribe only |
+| `MQTT_CLIENT_ID` | `quadrapp.mqtt.client-id` | empty (random id, clean session) | Unique per replica; when set, the session and its queued readings survive restarts |
+| `MQTT_SHARED_GROUP` | `quadrapp.mqtt.shared-group` | `quadrapp-backend` | Shared subscription group: replicas in one group receive each reading once |
+
+Gateways publish with QoS 1 on `quadrapp/{institutionId}/{gatewayHardwareId}/readings`; the backend subscribes to `$share/<group>/quadrapp/+/+/readings`. The broker must only let each gateway publish under its own prefix, because the backend trusts the topic as the gateway identity. Payload:
+
+```json
+{"eventId":"8f0d5c0e-3b1a-4d7e-9a35-2f8b1c7e4a10","sensorId":"sensor-0342","kind":"SPACE","state":"OCCUPIED","ts":"2026-10-09T13:05:12.200Z","battery":82,"rssi":-71}
+```
+
+`kind` is `SPACE` (with `state` `FREE` or `OCCUPIED`), `PASS` (with `direction` `IN` or `OUT`) or `HEARTBEAT`; `battery` (0-100) and `rssi` are optional. A message is acknowledged only after it was processed. Malformed messages, readings whose topic does not match the device, and readings that still fail after 3 retries are stored in `sensing.rejected_readings` and acknowledged.
+
 ## Database
 
 Each bounded context owns a PostgreSQL schema, with no foreign keys between schemas:
