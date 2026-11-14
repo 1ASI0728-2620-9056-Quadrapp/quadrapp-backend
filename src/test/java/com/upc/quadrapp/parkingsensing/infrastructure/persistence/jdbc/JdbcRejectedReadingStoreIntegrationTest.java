@@ -32,4 +32,15 @@ class JdbcRejectedReadingStoreIntegrationTest {
         assertThat(row.get("reason")).isEqualTo("Malformed message: kind");
         assertThat(((Timestamp) row.get("received_at")).toInstant()).isEqualTo(receivedAt);
     }
+
+    @Test
+    void storesAPayloadWithANulCharacterInsteadOfFailingForever() {
+        Instant receivedAt = Instant.parse("2026-11-14T12:00:01Z");
+
+        store.store("quadrapp/7/GW-NUL/readings", "{\"sensorId\":\"a\u0000b\"}", "Malformed message: nul", receivedAt);
+
+        String payload = jdbc.queryForObject("select payload from sensing.rejected_readings "
+                + "where topic = 'quadrapp/7/GW-NUL/readings'", String.class);
+        assertThat(payload).isEqualTo("{\"sensorId\":\"a\\u0000b\"}");
+    }
 }

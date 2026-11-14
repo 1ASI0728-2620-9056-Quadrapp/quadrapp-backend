@@ -1,5 +1,7 @@
 package com.upc.quadrapp.parkingsensing.infrastructure.mqtt;
 
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
+import org.springframework.dao.DataIntegrityViolationException;
 import com.upc.quadrapp.parkingsensing.application.internal.outboundservices.readings.RejectedReadingStorePort;
 import com.upc.quadrapp.parkingsensing.domain.model.commands.ProcessSensorReadingCommand;
 import com.upc.quadrapp.parkingsensing.domain.model.valueobjects.ReadingKind;
@@ -205,5 +207,17 @@ class MqttInboundListenerTest {
 
     private static byte[] bytes(String value) {
         return value.getBytes(StandardCharsets.UTF_8);
+    }
+
+    @Test
+    void aRejectionThatCanNeverBeStoredIsAcknowledgedInsteadOfBlockingTheNextReadings() {
+        doThrow(new DataIntegrityViolationException("invalid byte sequence"))
+                .when(rejected).store(anyString(), anyString(), anyString(), any());
+
+        assertTimeoutPreemptively(Duration.ofSeconds(5),
+                () -> listener.onReading(TOPIC, "not json".getBytes(StandardCharsets.UTF_8), acknowledge));
+
+        verify(rejected, times(1)).store(anyString(), anyString(), anyString(), any());
+        verify(acknowledge, times(1)).run();
     }
 }

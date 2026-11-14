@@ -6,6 +6,7 @@ import com.upc.quadrapp.parkingsensing.domain.services.SensorReadingCommandServi
 import com.upc.quadrapp.parkingsensing.infrastructure.readings.security.VerifiedGatewayPrincipal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContext;
@@ -74,6 +75,12 @@ public class MqttInboundListener {
         for (int round = 1; ; round++) {
             try {
                 settle(topic, payload, text, receivedAt);
+                break;
+            } catch (DataIntegrityViolationException unstorable) {
+                // The rejection itself can never be stored (a data error, not an outage): retrying
+                // would block every later reading, so the message is logged and acknowledged.
+                LOGGER.error("Dropped reading on {}: it could be neither processed nor stored as rejected",
+                        topic, unstorable);
                 break;
             } catch (RuntimeException unsettled) {
                 if (stopped || Thread.currentThread().isInterrupted()) {
