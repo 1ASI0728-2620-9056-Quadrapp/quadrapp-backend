@@ -28,8 +28,18 @@ public class InstitutionDomainPersistenceAdapter implements InstitutionDomainPer
     }
 
     @Override
-    public Optional<InstitutionDomain> findByDomain(String domain) {
-        return repository.findByDomain(domain).map(mapper::toDomain);
+    public Optional<InstitutionDomain> findVerifiedByDomain(String domain) {
+        return repository.findByDomainAndVerifiedAtIsNotNull(domain).map(mapper::toDomain);
+    }
+
+    @Override
+    public boolean existsByDomain(String domain) {
+        return repository.existsByDomain(domain);
+    }
+
+    @Override
+    public boolean existsByInstitutionIdAndDomain(Long institutionId, String domain) {
+        return repository.existsByInstitutionIdAndDomain(institutionId, domain);
     }
 
     @Override

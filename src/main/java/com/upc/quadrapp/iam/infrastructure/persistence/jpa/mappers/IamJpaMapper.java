@@ -132,6 +132,7 @@ public class IamJpaMapper {
         return RefreshToken.restore(
                 jpa.getId(),
                 jpa.getUserId(),
+                jpa.getFamilyId(),
                 jpa.getTokenHash(),
                 jpa.getExpiresAt(),
                 jpa.getRevokedAt(),
@@ -144,6 +145,7 @@ public class IamJpaMapper {
 
         jpa.setId(domain.getId());
         jpa.setUserId(domain.getUserId());
+        jpa.setFamilyId(domain.getFamilyId());
         jpa.setTokenHash(domain.getTokenHash());
         jpa.setExpiresAt(domain.getExpiresAt());
         jpa.setRevokedAt(domain.getRevokedAt());

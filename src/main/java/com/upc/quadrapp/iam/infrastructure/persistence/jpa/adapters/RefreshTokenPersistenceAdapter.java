@@ -8,7 +8,9 @@ import com.upc.quadrapp.iam.infrastructure.persistence.jpa.repositories.RefreshT
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.Optional;
+import java.util.UUID;
 
 @Repository
 @RequiredArgsConstructor
@@ -25,5 +27,10 @@ public class RefreshTokenPersistenceAdapter implements RefreshTokenPersistencePo
     public Optional<RefreshToken> findForUpdateByTokenHash(String hash
     ) {
         return repository.findLockedByTokenHash(hash).map(mapper::toDomain);
+    }
+
+    @Override
+    public int revokeFamily(UUID familyId, Instant now) {
+        return repository.revokeActiveByFamilyId(familyId, now);
     }
 }

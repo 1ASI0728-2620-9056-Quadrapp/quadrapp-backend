@@ -34,11 +34,7 @@ public class UserQueryServiceImpl implements UserQueryService {
                 query.userId()
         );
 
-        user.ifPresent(target ->
-                authorizationService.requireUserAccess(actor, target)
-        );
-
-        return user;
+        return visibleTo(actor, user);
     }
 
     @Override
@@ -63,11 +59,7 @@ public class UserQueryServiceImpl implements UserQueryService {
                 email.value()
         );
 
-        user.ifPresent(target ->
-                authorizationService.requireUserAccess(actor, target)
-        );
-
-        return user;
+        return visibleTo(actor, user);
     }
 
     @Override
@@ -86,5 +78,18 @@ public class UserQueryServiceImpl implements UserQueryService {
                 query.institutionId()
         );
     }
-}
 
+    /**
+     * A user of another institution looks missing (404), so its existence is not revealed.
+     * Inside the actor's own institution, a missing permission is still 403.
+     */
+    private Optional<User> visibleTo(User actor, Optional<User> user) {
+        return user
+                .filter(target -> authorizationService.canAccessInstitution(
+                        actor, target.getInstitutionId()))
+                .map(target -> {
+                    authorizationService.requireUserAccess(actor, target);
+                    return target;
+                });
+    }
+}

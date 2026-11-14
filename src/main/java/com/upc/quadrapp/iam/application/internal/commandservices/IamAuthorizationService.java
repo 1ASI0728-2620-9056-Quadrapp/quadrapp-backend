@@ -76,18 +76,19 @@ public class IamAuthorizationService {
             User actor,
             Long institutionId
     ) {
-        if (actor.getRole() == Roles.PLATFORM_ADMIN) {
-            return;
-        }
-
-        if (!Objects.equals(
-                actor.getInstitutionId(),
-                institutionId
-        )) {
+        if (!canAccessInstitution(actor, institutionId)) {
             throw new AccessDeniedException(
                     "Access to another institution is not allowed."
             );
         }
+    }
+
+    public boolean canAccessInstitution(
+            User actor,
+            Long institutionId
+    ) {
+        return actor.getRole() == Roles.PLATFORM_ADMIN ||
+                Objects.equals(actor.getInstitutionId(), institutionId);
     }
 
     public void requireInstitutionAdmin(
@@ -112,18 +113,28 @@ public class IamAuthorizationService {
     }
 
     public void requireUserAccess(User actor, User target) {
+        if (!canAccessUser(actor, target)) {
+            throw new AccessDeniedException(
+                    "Institution administrator permission is required."
+            );
+        }
+    }
+
+    /**
+     * A user can see itself; an institution administrator sees the users of its institution;
+     * a platform administrator sees everyone.
+     */
+    public boolean canAccessUser(User actor, User target) {
         if (actor.getRole() == Roles.PLATFORM_ADMIN) {
-            return;
+            return true;
         }
 
         if (Objects.equals(actor.getId(), target.getId())) {
-            return;
+            return true;
         }
 
-        requireInstitutionAdmin(
-                actor,
-                target.getInstitutionId()
-        );
+        return actor.getRole() == Roles.ADMIN &&
+                Objects.equals(actor.getInstitutionId(), target.getInstitutionId());
     }
 
     public void requireSelf(User actor, Long userId) {

@@ -1,5 +1,6 @@
 package com.upc.quadrapp.iam.application.internal.commandservices;
 
+import com.upc.quadrapp.iam.domain.model.exceptions.IamConflictException;
 import com.upc.quadrapp.iam.application.internal.outboundservices.hashing.TokenHashingService;
 import com.upc.quadrapp.iam.application.internal.outboundservices.mail.InvitationDeliveryService;
 import com.upc.quadrapp.iam.application.internal.outboundservices.persistence.InstitutionDomainPersistencePort;
@@ -24,6 +25,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.time.temporal.ChronoUnit;
 
 @Service
@@ -64,27 +66,37 @@ public class UserCommandServiceImpl implements UserCommandService {
                 ));
 
         if (!institution.isActive()) {
-            throw new IllegalStateException(
+            throw new IamConflictException(
                     "Institution is not active."
             );
         }
 
         EmailAddress email = new EmailAddress(command.email());
 
-        if (userPersistencePort.existsByEmail(email.value())) {
-            throw new IllegalStateException(
+        Optional<User> pendingUser = userPersistencePort.findByEmail(email.value());
+
+        // Only a pending invitation of this same institution can be renewed; any other existing
+        // account keeps answering as an already registered email.
+        if (pendingUser.isPresent() &&
+                (pendingUser.get().getStatus() != UserStatus.INVITED ||
+                        !command.institutionId().equals(pendingUser.get().getInstitutionId()))) {
+            throw new IamConflictException(
                     "Email is already registered."
             );
         }
 
         var institutionalDomain = institutionDomainPersistencePort
-                .findByDomain(email.domain())
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "Email domain is not registered."
-                ));
+                .findVerifiedByDomain(email.domain());
 
-        if (!institutionalDomain.isVerified() ||
-                !institutionalDomain.getInstitutionId()
+        if (institutionalDomain.isEmpty() &&
+                !institutionDomainPersistencePort.existsByDomain(email.domain())) {
+            throw new IllegalArgumentException(
+                    "Email domain is not registered."
+            );
+        }
+
+        if (institutionalDomain.isEmpty() ||
+                !institutionalDomain.get().getInstitutionId()
                         .equals(command.institutionId())) {
             throw new IllegalArgumentException(
                     "Email domain is not verified for this institution."
@@ -106,15 +118,30 @@ public class UserCommandServiceImpl implements UserCommandService {
                 invitationToken
         );
 
-        User user = User.invite(
-                command.institutionId(),
-                actor.getId(),
-                email.value(),
-                command.role(),
-                invitationHash,
-                now.plus(invitationExpirationHours, ChronoUnit.HOURS),
-                now
-        );
+        Instant invitationExpiresAt =
+                now.plus(invitationExpirationHours, ChronoUnit.HOURS);
+
+        User user;
+        if (pendingUser.isPresent()) {
+            user = pendingUser.get();
+            user.reissueInvitation(
+                    command.institutionId(),
+                    command.role(),
+                    invitationHash,
+                    invitationExpiresAt,
+                    now
+            );
+        } else {
+            user = User.invite(
+                    command.institutionId(),
+                    actor.getId(),
+                    email.value(),
+                    command.role(),
+                    invitationHash,
+                    invitationExpiresAt,
+                    now
+            );
+        }
 
         User savedUser = userPersistencePort.save(user);
 
@@ -154,21 +181,25 @@ public class UserCommandServiceImpl implements UserCommandService {
                 ));
 
         if (!institution.isActive()) {
-            throw new IllegalStateException(
+            throw new IamConflictException(
                     "Institution is not active."
             );
         }
 
         var institutionalDomain = institutionDomainPersistencePort
-                .findByDomain(user.getEmail().domain())
-                .orElseThrow(() -> new IllegalStateException(
-                        "Institutional domain was not found."
-                ));
+                .findVerifiedByDomain(user.getEmail().domain());
 
-        if (!institutionalDomain.isVerified() ||
-                !institutionalDomain.getInstitutionId()
+        if (institutionalDomain.isEmpty() &&
+                !institutionDomainPersistencePort.existsByDomain(user.getEmail().domain())) {
+            throw new IamConflictException(
+                    "Institutional domain was not found."
+            );
+        }
+
+        if (institutionalDomain.isEmpty() ||
+                !institutionalDomain.get().getInstitutionId()
                         .equals(user.getInstitutionId())) {
-            throw new IllegalStateException(
+            throw new IamConflictException(
                     "Institutional domain is not verified."
             );
         }
@@ -199,7 +230,7 @@ public class UserCommandServiceImpl implements UserCommandService {
                 ));
 
         if (user.getStatus() != UserStatus.ACTIVE) {
-            throw new IllegalStateException(
+            throw new IamConflictException(
                     "User is not active."
             );
         }

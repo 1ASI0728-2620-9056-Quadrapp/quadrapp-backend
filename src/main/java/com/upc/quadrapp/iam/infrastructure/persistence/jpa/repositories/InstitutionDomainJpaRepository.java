@@ -7,6 +7,10 @@ import java.util.List;
 import java.util.Optional;
 
 public interface InstitutionDomainJpaRepository extends JpaRepository<InstitutionDomainJpaEntity, Long> {
-    Optional<InstitutionDomainJpaEntity> findByDomain(String domain);
+    Optional<InstitutionDomainJpaEntity> findByDomainAndVerifiedAtIsNotNull(String domain);
+
+    boolean existsByDomain(String domain);
+
+    boolean existsByInstitutionIdAndDomain(Long institutionId, String domain);
     List<InstitutionDomainJpaEntity> findByInstitutionId(Long institutionId);
 }

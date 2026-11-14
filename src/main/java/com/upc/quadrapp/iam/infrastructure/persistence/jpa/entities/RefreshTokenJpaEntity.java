@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.Instant;
+import java.util.UUID;
 
 @Entity
 @Table(schema = "iam", name = "refresh_tokens", uniqueConstraints = @UniqueConstraint(name = "uk_refresh_tokens_token_hash", columnNames = "token_hash"))
@@ -25,6 +26,9 @@ public class RefreshTokenJpaEntity {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", referencedColumnName = "id", insertable = false, updatable = false, foreignKey = @ForeignKey(name = "fk_refresh_tokens_user"))
     private UserJpaEntity user;
+
+    @Column(name = "family_id", nullable = false, columnDefinition = "uuid")
+    private UUID familyId;
 
     @Column(name = "token_hash", nullable = false, length = 255)
     private String tokenHash;

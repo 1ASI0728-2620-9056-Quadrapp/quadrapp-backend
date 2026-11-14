@@ -8,7 +8,12 @@ import java.util.Optional;
 public interface InstitutionDomainPersistencePort {
     InstitutionDomain save(InstitutionDomain institutionDomain);
     Optional<InstitutionDomain> findById(Long domainId);
-    Optional<InstitutionDomain> findByDomain(String domain);
+    /** The verified domain, if any: a domain can be claimed by several institutions but verified for one. */
+    Optional<InstitutionDomain> findVerifiedByDomain(String domain);
+
+    boolean existsByDomain(String domain);
+
+    boolean existsByInstitutionIdAndDomain(Long institutionId, String domain);
     List<InstitutionDomain> findByInstitutionId(Long institutionId);
 }
 

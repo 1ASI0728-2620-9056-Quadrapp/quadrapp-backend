@@ -1,5 +1,6 @@
 package com.upc.quadrapp.iam.domain.model.aggregates;
 
+import com.upc.quadrapp.iam.domain.model.exceptions.IamConflictException;
 import com.upc.quadrapp.iam.domain.model.valueobjects.EmailAddress;
 import com.upc.quadrapp.iam.domain.model.valueobjects.NotificationPreferences;
 import com.upc.quadrapp.iam.domain.model.valueobjects.Roles;
@@ -230,6 +231,46 @@ public class User {
         );
     }
 
+    /**
+     * Sends the invitation again with a new token and expiry, for an invitation that expired or
+     * never arrived. Only a pending invitation of the same institution can be renewed.
+     */
+    public void reissueInvitation(
+            Long institutionId,
+            Roles role,
+            String tokenHash,
+            Instant expiresAt,
+            Instant now
+    ) {
+        Objects.requireNonNull(now, "Timestamp is required.");
+
+        if (status != UserStatus.INVITED ||
+                !Objects.equals(this.institutionId, institutionId)) {
+            throw new IamConflictException(
+                    "Email is already registered."
+            );
+        }
+
+        if (role == null || !role.canBeInvited()) {
+            throw new IllegalArgumentException(
+                    "Only administrators and operators can be invited."
+            );
+        }
+
+        validateRequiredTokenHash(tokenHash);
+
+        if (expiresAt == null || !expiresAt.isAfter(now)) {
+            throw new IllegalArgumentException(
+                    "Invitation expiration must be in the future."
+            );
+        }
+
+        this.role = role;
+        this.invitationTokenHash = tokenHash;
+        this.invitationExpiresAt = expiresAt;
+        this.updatedAt = now;
+    }
+
     public void acceptInvitation(
             String providedTokenHash,
             String fullName,
@@ -238,14 +279,14 @@ public class User {
         Objects.requireNonNull(now, "Timestamp is required.");
 
         if (status != UserStatus.INVITED) {
-            throw new IllegalStateException(
+            throw new IamConflictException(
                     "User has no pending invitation."
             );
         }
 
         if (invitationExpiresAt == null ||
                 !now.isBefore(invitationExpiresAt)) {
-            throw new IllegalStateException(
+            throw new IamConflictException(
                     "Invitation has expired."
             );
         }
@@ -281,7 +322,7 @@ public class User {
         Objects.requireNonNull(now, "Timestamp is required.");
 
         if (status != UserStatus.ACTIVE) {
-            throw new IllegalStateException(
+            throw new IamConflictException(
                     "User account is not active."
             );
         }
@@ -313,7 +354,7 @@ public class User {
         }
 
         if (status != UserStatus.ACTIVE) {
-            throw new IllegalStateException(
+            throw new IamConflictException(
                     "Only active users can change roles."
             );
         }
@@ -326,7 +367,7 @@ public class User {
         Objects.requireNonNull(now, "Timestamp is required.");
 
         if (status == UserStatus.DISABLED) {
-            throw new IllegalStateException(
+            throw new IamConflictException(
                     "User is already disabled."
             );
         }
@@ -339,13 +380,13 @@ public class User {
         Objects.requireNonNull(now, "Timestamp is required.");
 
         if (status != UserStatus.DISABLED) {
-            throw new IllegalStateException(
+            throw new IamConflictException(
                     "Only disabled users can be reactivated."
             );
         }
 
         if (verifiedAt == null) {
-            throw new IllegalStateException(
+            throw new IamConflictException(
                     "Unverified users cannot be reactivated directly."
             );
         }

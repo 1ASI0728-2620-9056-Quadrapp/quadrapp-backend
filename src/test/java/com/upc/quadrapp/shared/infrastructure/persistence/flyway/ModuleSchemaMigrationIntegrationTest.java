@@ -5,6 +5,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
+
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -41,14 +47,25 @@ class ModuleSchemaMigrationIntegrationTest {
     }
 
     @Test
-    void eachModuleKeepsItsOwnSuccessfulMigrationHistory() {
-        MODULE_TABLES.keySet().forEach(schema ->
-                assertThat(jdbcTemplate.queryForList(
-                        "select version from " + schema + ".flyway_schema_history"
-                                + " where version is not null and success order by installed_rank",
-                        String.class))
-                        .as("applied migrations in schema %s", schema)
-                        .containsExactly("1"));
+    void eachModuleKeepsItsOwnSuccessfulMigrationHistory() throws IOException {
+        for (String schema : MODULE_TABLES.keySet()) {
+            assertThat(jdbcTemplate.queryForList(
+                    "select version from " + schema + ".flyway_schema_history"
+                            + " where version is not null and success order by installed_rank",
+                    String.class))
+                    .as("applied migrations in schema %s", schema)
+                    .containsExactlyElementsOf(migrationVersions(schema));
+        }
+    }
+
+    /** Versions of the module's migration files, in order: every one of them must be applied. */
+    private static List<String> migrationVersions(String schema) throws IOException {
+        Resource[] files = new PathMatchingResourcePatternResolver()
+                .getResources("classpath:db/migration/" + schema + "/V*__*.sql");
+        return Arrays.stream(files)
+                .map(file -> file.getFilename().substring(1, file.getFilename().indexOf("__")))
+                .sorted(Comparator.comparingInt(Integer::parseInt))
+                .toList();
     }
 
     @Test
