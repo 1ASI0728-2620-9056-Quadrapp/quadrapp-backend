@@ -34,6 +34,20 @@ public class IamContextFacade {
         );
     }
 
+    /**
+     * Whether the authenticated user can see data of the institution. Modules use it to answer
+     * "not found" for another institution's resources instead of revealing that they exist.
+     */
+    public boolean canAccessInstitution(Long institutionId) {
+
+        User actor = authorizationService.requireAuthenticatedUser();
+
+        return authorizationService.canAccessInstitution(
+                actor,
+                institutionId
+        );
+    }
+
     public void requireInstitutionAdmin(Long institutionId) {
 
         User actor = authorizationService.requireAuthenticatedUser();

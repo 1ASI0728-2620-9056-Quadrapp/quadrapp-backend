@@ -8,7 +8,6 @@ import com.upc.quadrapp.parkingconfiguration.domain.model.commands.ScheduleCalen
 import com.upc.quadrapp.parkingconfiguration.domain.model.valueobjects.EventWindow;
 import com.upc.quadrapp.parkingconfiguration.domain.services.CalendarEventCommandService;
 
-import org.springframework.security.access.AccessDeniedException;
 
 public final class CalendarEventCommandServiceImpl implements CalendarEventCommandService {
 
@@ -46,11 +45,12 @@ public final class CalendarEventCommandServiceImpl implements CalendarEventComma
                             )
                     );
 
+            // A lot of another institution reads as missing, so its existence is not revealed.
             if (!lot.getInstitutionId().equals(
                     command.institutionId()
             )) {
-                throw new AccessDeniedException(
-                        "Parking lot belongs to another institution."
+                throw new IllegalArgumentException(
+                        "Parking lot not found."
                 );
             }
         }

@@ -21,6 +21,13 @@ public class IamParkingAuthorizationAdapter
     }
 
     @Override
+    public boolean canRead(Long institutionId) {
+        return iamContextFacade.canAccessInstitution(
+                institutionId
+        );
+    }
+
+    @Override
     public void requireInstitutionWrite(Long institutionId) {
         iamContextFacade.requireInstitutionAdmin(
                 institutionId
