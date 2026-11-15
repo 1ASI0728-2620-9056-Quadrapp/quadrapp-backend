@@ -19,7 +19,7 @@ Internet ──443──▶ caddy ──▶ backend:8080 ──▶ postgres:5432
 - **One backend instance with `SPRING_PROFILES_ACTIVE=dev`.** The backend only starts with the `dev` profile: the OTP store and the sensing adapters (`InMemoryOtpChallengeStore`, `InMemoryReadingProcessingAdapter`, `InMemorySensorFeedStateAdapter`) exist only there and keep their state in memory. Two replicas would not share OTP codes or sensor state, so the second replica (QAS-04) comes in Sprint 2 with persistent stores. A backend restart forgets pending OTP codes.
 - **No Redis.** D7b lists Redis 7, but nothing in the backend uses Redis today (no dependency, no configuration). It is added when a feature needs it.
 - **Single point of failure.** If the instance stops, everything stops. `restart: unless-stopped` only recovers crashed containers. Docker Compose does not restart a container that is only *unhealthy*.
-- **No deploy from GitHub Actions yet.** Upgrades are a manual `docker compose pull` (see [Next steps](#next-steps)).
+- **Only `main` deploys by itself.** `develop` builds its image but is deployed by hand (see [8. Upgrade](#8-upgrade)).
 
 ## Operating system: Ubuntu Server 24.04 LTS
 
@@ -43,7 +43,9 @@ Create these once, in the same region (for example `us-east-1`):
 | EC2 instance | `t4g.small` (AWS Graviton, arm64, 2 vCPU, 2 GiB), AMI Ubuntu Server 24.04 LTS (arm64), gp3 root volume of 30 GB, IMDSv2 required. Decision D7b named `c7i-flex.large` (x86_64); the team chose the t4g.small instead. The memory limits in `docker-compose.yml` add up to about 1.7 GB to fit it |
 | Elastic IP | Associated with the instance, so DNS survives stop and start |
 | Security group | Inbound 443/tcp from `0.0.0.0/0` and `::/0`; 8883/tcp from `0.0.0.0/0` (or only the campus IP of the gateways); no port 22 (use Session Manager) or 22/tcp from your IP `/32` only. Port 80 stays closed: Caddy validates with the TLS-ALPN challenge on 443 |
-| IAM role of the instance | `AmazonSSMManagedInstanceCore` (Session Manager), plus an inline policy with `s3:PutObject`, `s3:GetObject` and `s3:ListBucket` on the backup bucket |
+| IAM role of the instance | `AmazonSSMManagedInstanceCore` (Session Manager), plus an inline policy with `s3:PutObject`, `s3:GetObject` and `s3:ListBucket` on the backup bucket, and `ssm:GetParametersByPath`, `ssm:GetParameter(s)` on `/quadrapp/prod/*` |
+| SSM Parameter Store | One `SecureString` per secret of `.env` under `/quadrapp/prod/` (see [Automatic deploy](#automatic-deploy-main)) |
+| GitHub OIDC provider and deploy role | Provider `token.actions.githubusercontent.com` (audience `sts.amazonaws.com`); role `quadrapp-github-deploy`, trusted only for this repository on `refs/heads/main`, allowed `ssm:SendCommand` (`AWS-RunShellScript`, this instance) and `ssm:GetCommandInvocation` |
 | S3 bucket | Private, for `pg_dump` files, with a lifecycle rule that expires objects under `postgres/` after 30 days |
 | Budget | An AWS Budgets alert on the credit, so a forgotten instance does not use it up |
 
@@ -168,15 +170,41 @@ Caddy renews certificates by itself. Mosquitto only reads its certificate at sta
 
 ## 8. Upgrade
 
-```bash
-cd ~/quadrapp-backend && git pull           # deployment files
-cd deploy
-docker compose pull backend
-docker compose up -d backend                # recreates only what changed
-docker compose ps
+### Automatic deploy (main)
+
+Every push to `main` deploys by itself: the `deploy` job of `.github/workflows/backend-image.yml` runs after the tests pass and the image `sha-<7 chars>` is in GHCR. Pushes to `develop` only build the image.
+
+```
+push to main -> test -> image sha-<7 chars> -> deploy (OIDC -> AWS role -> SSM on the instance)
+  git checkout <commit>; scripts/deploy.sh sha-<7 chars>
+    1. secrets from SSM Parameter Store into .env
+    2. docker compose pull backend    (fails -> stop, nothing changed)
+    3. BACKEND_TAG=sha-<7 chars>; docker compose up -d
+    4. wait for https://API_DOMAIN/v3/api-docs = 200 (180 s)
+       otherwise: previous BACKEND_TAG back, docker compose up -d, the job fails
 ```
 
-Rollback: set `BACKEND_TAG=sha-<previous 7 chars>` in `.env` and run `docker compose up -d backend`. Migrations already applied are not reverted; a migration that breaks the previous version needs a restore.
+- **No stored keys.** GitHub's OIDC token is exchanged for the role `quadrapp-github-deploy`. Its trust policy only accepts `repo:1ASI0728-2620-9056-Quadrapp/quadrapp-backend:ref:refs/heads/main`, and it may only run `ssm:SendCommand` with `AWS-RunShellScript` on the instance and read the result.
+- **Secrets.** `deploy.sh` writes every `SecureString` under `/quadrapp/prod/` into `.env` with the key of its name (`/quadrapp/prod/JWT_SECRET_BASE64` -> `JWT_SECRET_BASE64`). Keys without a parameter (domains, `ACME_EMAIL`, `BACKUP_S3_URI`...) keep their `.env` value. To change a secret, update the parameter and redeploy; an edit in `.env` alone is overwritten on the next deploy. The instance role reads that path; nothing else does.
+- **Rollback scope.** Only the image goes back. Flyway migrations stay applied and `deploy/` stays at the new commit, so a migration must keep working with the previous version (add columns, do not drop or rename them in the same release).
+- **One deploy at a time, newest wins.** The SSM command takes `/tmp/quadrapp-deploy.lock` before its `git checkout`, so a running deploy never has its files changed under it, and it only deploys the commit that is still the tip of `main`: an older run that gets the lock later is skipped (green, "skipping").
+- **Redeploy** the current `main`: Actions -> backend-image -> Run workflow on `main`.
+
+```bash
+# Add or change a secret (from a machine with an AWS profile of the account)
+aws ssm put-parameter --name /quadrapp/prod/MAIL_PASSWORD --type SecureString --overwrite --value '<value>'
+```
+
+### By hand
+
+On the instance, the same script deploys any published tag, with the same rollback:
+
+```bash
+cd ~/quadrapp-backend && git pull           # deployment files
+sudo deploy/scripts/deploy.sh sha-<7 chars>   # or develop, main, a git tag
+```
+
+`READY_TIMEOUT_SECONDS` (default 180) changes how long it waits for the new version.
 
 ## 9. Backup and restore
 
@@ -223,8 +251,4 @@ docker compose --env-file test.env down -v   # removes the test volumes
 
 ## Next steps
 
-These need the AWS account and are not automated yet:
-
-1. **Deploy from GitHub Actions.** Add an AWS IAM role trusted by GitHub's OIDC provider (no stored keys) that may only run `ssm:SendCommand` with `AWS-RunShellScript` on this instance. A job after `image` then runs `cd ~/quadrapp-backend/deploy && docker compose pull backend && docker compose up -d backend` on the instance through SSM.
-2. **Secrets in SSM Parameter Store.** Store the `.env` values as `SecureString` parameters under `/quadrapp/prod/`, give the instance role `ssm:GetParametersByPath` on that path, and render `.env` from them before `docker compose up` instead of editing it by hand.
-3. **Second backend replica** once the OTP store and the sensing adapters are persistent (Sprint 2): remove `SPRING_PROFILES_ACTIVE=dev`, add a second service, and let Caddy balance with `reverse_proxy backend-1:8080 backend-2:8080`.
+1. **Second backend replica** once the OTP store and the sensing adapters are persistent (Sprint 2): remove `SPRING_PROFILES_ACTIVE=dev`, add a second service, and let Caddy balance with `reverse_proxy backend-1:8080 backend-2:8080`.
