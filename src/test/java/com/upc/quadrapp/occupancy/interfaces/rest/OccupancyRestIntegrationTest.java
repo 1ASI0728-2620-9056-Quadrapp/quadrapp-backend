@@ -99,6 +99,8 @@ class OccupancyRestIntegrationTest {
                 UUID.randomUUID().toString(), OccupancyEventType.OCCUPIED, DETECTED_AT));
 
         mvc.perform(authenticated(get("/api/v1/parking-lots/{id}/spaces/status", own.parkingLotId)))
+                .andExpect(status().isNotFound());
+        mvc.perform(authenticated(get("/api/v1/parking-lots/{id}/space-statuses", own.parkingLotId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(3))
                 .andExpect(jsonPath("$[0].spaceId").value(own.space(0)))
@@ -119,8 +121,8 @@ class OccupancyRestIntegrationTest {
     void resourcesOfAnotherInstitutionAnswerLikeMissingOnes() throws Exception {
         expectNotFound(get("/api/v1/parking-lots/{id}/occupancy", other.parkingLotId), "Parking lot not found.");
         expectNotFound(get("/api/v1/parking-lots/{id}/occupancy", Long.MAX_VALUE), "Parking lot not found.");
-        expectNotFound(get("/api/v1/parking-lots/{id}/spaces/status", other.parkingLotId), "Parking lot not found.");
-        expectNotFound(get("/api/v1/parking-lots/{id}/spaces/status", Long.MAX_VALUE), "Parking lot not found.");
+        expectNotFound(get("/api/v1/parking-lots/{id}/space-statuses", other.parkingLotId), "Parking lot not found.");
+        expectNotFound(get("/api/v1/parking-lots/{id}/space-statuses", Long.MAX_VALUE), "Parking lot not found.");
         expectNotFound(get("/api/v1/zones/{id}/occupancy", other.zoneId), "Zone not found.");
         expectNotFound(get("/api/v1/zones/{id}/occupancy", Long.MAX_VALUE), "Zone not found.");
         expectNotFound(get("/api/v1/levels/{id}/occupancy", other.levelId), "Level not found.");

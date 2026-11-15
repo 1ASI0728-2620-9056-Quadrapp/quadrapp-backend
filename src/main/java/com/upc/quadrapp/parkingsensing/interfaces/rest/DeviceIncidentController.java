@@ -9,6 +9,7 @@ import com.upc.quadrapp.parkingsensing.domain.services.DeviceIncidentQueryServic
 import com.upc.quadrapp.parkingsensing.interfaces.rest.resources.*;
 import com.upc.quadrapp.parkingsensing.interfaces.rest.transform.*;
 
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
@@ -39,6 +40,14 @@ public class DeviceIncidentController {
     private final IamContextFacade iam;
     private final Clock clock;
 
+    @Operation(
+            operationId = "reportDeviceIncident",
+            summary = "Report a device incident",
+            description = "Institution administrators. Records a USER_REPORT incident of a device identified by "
+                    + "deviceId or hardwareId (201); 400 for invalid data or a device of another "
+                    + "institution or parking lot, 403 for other roles and 404 when the device does not "
+                    + "exist."
+    )
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<DeviceIncidentResource> report(
             @Valid @RequestBody ReportDeviceIncidentResource resource
@@ -69,19 +78,26 @@ public class DeviceIncidentController {
                 );
     }
 
+    @Operation(
+            operationId = "listDeviceIncidents",
+            summary = "List device incidents",
+            description = "Any user of an institution. Returns the incidents of the institution, newest first, "
+                    + "optionally of one parking lot and with one status, OPEN or RESOLVED (200); 400 for "
+                    + "any other status."
+    )
     @GetMapping
     public ResponseEntity<List<DeviceIncidentResource>> list(
             @RequestParam(required = false)
             @Positive Long parkingLotId,
 
-            @RequestParam(defaultValue = "false")
-            boolean onlyOpen
+            @RequestParam(required = false)
+            String status
     ) {
         var incidents = queries.handle(
                 new GetDeviceIncidentsQuery(
                         currentInstitutionId(),
                         parkingLotId,
-                        onlyOpen
+                        statusFilter(status)
                 )
         );
 
@@ -95,9 +111,20 @@ public class DeviceIncidentController {
         );
     }
 
-    @PostMapping("/{incidentId}/resolve")
+    @Operation(
+            operationId = "resolveDeviceIncident",
+            summary = "Resolve a device incident",
+            description = "Institution administrators. Send {\"status\": \"RESOLVED\"}; any other status is 400. "
+                    + "Returns the resolved incident (200); 403 for other roles, 404 when it does not exist "
+                    + "and 409 when it is already resolved."
+    )
+    @PatchMapping(
+            value = "/{incidentId}",
+            consumes = MediaType.APPLICATION_JSON_VALUE
+    )
     public ResponseEntity<DeviceIncidentResource> resolve(
-            @PathVariable @Positive Long incidentId
+            @PathVariable @Positive Long incidentId,
+            @Valid @RequestBody UpdateDeviceIncidentResource resource
     ) {
         var actor = iam.getCurrentUser();
 
@@ -122,6 +149,20 @@ public class DeviceIncidentController {
                 DeviceIncidentResourceFromEntityAssembler
                         .toResourceFromEntity(resolved)
         );
+    }
+
+    private static GetDeviceIncidentsQuery.Status statusFilter(String status) {
+        if (status == null) {
+            return null;
+        }
+
+        try {
+            return GetDeviceIncidentsQuery.Status.valueOf(status);
+        } catch (IllegalArgumentException invalid) {
+            throw new IllegalArgumentException(
+                    "status must be OPEN or RESOLVED."
+            );
+        }
     }
 
     private Long currentInstitutionId() {

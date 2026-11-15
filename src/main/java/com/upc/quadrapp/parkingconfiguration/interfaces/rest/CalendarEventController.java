@@ -9,6 +9,7 @@ import com.upc.quadrapp.parkingconfiguration.interfaces.rest.resources.*;
 import com.upc.quadrapp.parkingconfiguration.interfaces.rest.transform.CalendarEventCommandFromResourceAssembler;
 import com.upc.quadrapp.parkingconfiguration.interfaces.rest.transform.CalendarEventResourceFromEntityAssembler;
 
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -28,13 +29,20 @@ import java.util.List;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping(value = "/api/v1/calendar-events", produces = MediaType.APPLICATION_JSON_VALUE)
-@Tag(name = "Calendar Events", description = "")
+@Tag(name = "Calendar Events", description = "Schedule, cancel, and query campus calendar events.")
 public class CalendarEventController {
 
     private final CalendarEventCommandService commands;
     private final CalendarEventQueryService queries;
     private final IamContextFacade iam;
 
+    @Operation(
+            operationId = "scheduleCalendarEvent",
+            summary = "Schedule a calendar event",
+            description = "Institution administrators. Schedules a campus event for a parking lot, or one of "
+                    + "its zones, that the forecasts take into account (201); 400 for invalid data or an "
+                    + "unknown parking lot or zone and 403 for other roles."
+    )
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<CalendarEventResource> schedule(
             @Valid @RequestBody ScheduleCalendarEventResource resource
@@ -62,11 +70,26 @@ public class CalendarEventController {
     }
 
     /**
-     * Cancels a scheduled event (US35, scenario 3): 200 with the cancelled event, 409 if it was
-     * already cancelled, 404 if it does not exist or belongs to another institution.
+     * Cancels a scheduled event (US35, scenario 3) with {@code {"status": "CANCELLED"}}: 200 with
+     * the cancelled event, which is kept, 409 if it was already cancelled, 404 if it does not exist
+     * or belongs to another institution, 400 for any other status.
      */
-    @PostMapping("/{calendarEventId}/cancellation")
-    public ResponseEntity<CalendarEventResource> cancel(@PathVariable Long calendarEventId) {
+    @Operation(
+            operationId = "cancelCalendarEvent",
+            summary = "Cancel a calendar event",
+            description = "Institution administrators. Send {\"status\": \"CANCELLED\"}; any other status is 400. "
+                    + "The event is kept and its forecasts are regenerated (200); 403 for other roles, 404 "
+                    + "when it does not exist or belongs to another institution and 409 when it is already "
+                    + "cancelled."
+    )
+    @PatchMapping(
+            value = "/{calendarEventId}",
+            consumes = MediaType.APPLICATION_JSON_VALUE
+    )
+    public ResponseEntity<CalendarEventResource> cancel(
+            @PathVariable Long calendarEventId,
+            @Valid @RequestBody UpdateCalendarEventResource resource
+    ) {
         Long institutionId = requireInstitutionId(
                 iam.getCurrentUser().institutionId()
         );
@@ -80,6 +103,13 @@ public class CalendarEventController {
         );
     }
 
+    @Operation(
+            operationId = "listCalendarEvents",
+            summary = "List the calendar events of the institution",
+            description = "Any user of an institution. Returns the events between the required from and to "
+                    + "instants (ISO-8601) (200); 400 when a bound is missing or invalid and 403 for users "
+                    + "without an institution."
+    )
     @GetMapping
     public ResponseEntity<List<CalendarEventResource>> list(
             @RequestParam

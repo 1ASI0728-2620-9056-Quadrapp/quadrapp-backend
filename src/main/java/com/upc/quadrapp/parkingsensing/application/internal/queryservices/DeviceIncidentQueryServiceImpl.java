@@ -29,6 +29,6 @@ public final class DeviceIncidentQueryServiceImpl implements DeviceIncidentQuery
             configuration.requireParkingLot(query.institutionId(), query.parkingLotId());
         }
         return incidents.findByInstitutionIdAndOptionalParkingLotId(
-                query.institutionId(), query.parkingLotId(), query.onlyOpen());
+                query.institutionId(), query.parkingLotId(), query.status());
     }
 }

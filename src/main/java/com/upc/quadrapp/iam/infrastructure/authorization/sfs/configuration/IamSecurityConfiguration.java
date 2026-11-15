@@ -57,7 +57,7 @@ public class IamSecurityConfiguration {
                                 "/api/v1/iam/auth/sign-in",
                                 "/api/v1/iam/auth/refresh",
                                 "/api/v1/iam/auth/sign-out",
-                                "/api/v1/iam/invitations/accept"
+                                "/api/v1/iam/invitation-acceptances"
                         ).permitAll()
 
                         // Development documentation endpoints

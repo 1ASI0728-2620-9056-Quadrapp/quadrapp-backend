@@ -5,7 +5,6 @@ import com.upc.quadrapp.iam.application.internal.outboundservices.security.Curre
 import com.upc.quadrapp.iam.domain.model.commands.UpdateNotificationPreferencesCommand;
 import com.upc.quadrapp.iam.domain.model.queries.GetUserByEmailQuery;
 import com.upc.quadrapp.iam.domain.model.queries.GetUserByIdQuery;
-import com.upc.quadrapp.iam.domain.model.queries.GetUsersByInstitutionQuery;
 import com.upc.quadrapp.iam.domain.services.UserCommandService;
 import com.upc.quadrapp.iam.domain.services.UserQueryService;
 
@@ -14,6 +13,7 @@ import com.upc.quadrapp.iam.interfaces.rest.resources.UserResource;
 import com.upc.quadrapp.iam.interfaces.rest.transform.NotificationPreferencesFromResourceAssembler;
 import com.upc.quadrapp.iam.interfaces.rest.transform.UserResourceFromEntityAssembler;
 
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -24,8 +24,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
-
-import java.util.List;
 
 @SecurityRequirement(name = "bearerAuth")
 @RestController
@@ -38,6 +36,12 @@ public class UsersController {
     private final UserCommandService userCommandService;
     private final CurrentUserService currentUserService;
 
+    @Operation(
+            operationId = "getCurrentUser",
+            summary = "Get the signed-in user",
+            description = "Any authenticated user. Returns the user that owns the access token (200); 403 when "
+                    + "the user or its institution is not active."
+    )
     @GetMapping("/me")
     public ResponseEntity<UserResource> getCurrentUser() {
 
@@ -55,7 +59,14 @@ public class UsersController {
         );
     }
 
-    @GetMapping("/{userId}")
+    @Operation(
+            operationId = "getUser",
+            summary = "Get a user",
+            description = "The user itself, administrators of its institution and platform administrators. "
+                    + "Returns the user (200); 403 for other users of the same institution and 404 when it "
+                    + "does not exist or belongs to another institution."
+    )
+    @GetMapping("/{userId:\\d+}")
     public ResponseEntity<UserResource> getById(
             @PathVariable Long userId
     ) {
@@ -71,7 +82,15 @@ public class UsersController {
         );
     }
 
-    @GetMapping("/by-email")
+    @Operation(
+            operationId = "findUserByEmail",
+            summary = "Find a user by email",
+            description = "Any user for its own email; administrators and platform administrators for any "
+                    + "email. The email filter is required. Returns the user (200); 400 for a missing or "
+                    + "invalid email, 403 for other users and 404 when there is none or it belongs to "
+                    + "another institution."
+    )
+    @GetMapping
     public ResponseEntity<UserResource> getByEmail(
             @RequestParam String email
     ) {
@@ -87,24 +106,13 @@ public class UsersController {
         );
     }
 
-    @GetMapping("/institution/{institutionId}")
-    public ResponseEntity<List<UserResource>> getByInstitution(
-            @PathVariable Long institutionId
-    ) {
-        var users = userQueryService.handle(
-                new GetUsersByInstitutionQuery(institutionId)
-        );
-
-        var resources = users.stream()
-                .map(
-                        UserResourceFromEntityAssembler
-                                ::toResourceFromEntity
-                )
-                .toList();
-
-        return ResponseEntity.ok(resources);
-    }
-
+    @Operation(
+            operationId = "updateNotificationPreferences",
+            summary = "Update the notification preferences of a user",
+            description = "Only the user itself. Replaces its notification preferences and returns the user "
+                    + "(200); 400 for invalid data, 403 for another user and 409 when the user is not "
+                    + "active."
+    )
     @PutMapping(
             value = "/{userId}/notification-preferences",
             consumes = MediaType.APPLICATION_JSON_VALUE

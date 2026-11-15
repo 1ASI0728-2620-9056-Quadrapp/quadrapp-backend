@@ -79,7 +79,7 @@ Each bounded context owns a PostgreSQL schema, with no foreign keys between sche
 
 ## Parking Configuration: campus events
 
-- `POST /api/v1/calendar-events` schedules an event and `POST /api/v1/calendar-events/{id}/cancellation` cancels it (US35, scenario 3): 200 with the cancelled event (`cancelledAt` set), 409 if it was already cancelled, 404 for a missing event or one of another institution, 403 without the institution write permission. A cancelled event is not scheduled again; register a new one.
+- `POST /api/v1/calendar-events` schedules an event and `PATCH /api/v1/calendar-events/{id}` with `{"status": "CANCELLED"}` cancels it (US35, scenario 3): 200 with the cancelled event (`cancelledAt` set; the event is kept), 400 for any other status, 409 if it was already cancelled, 404 for a missing event or one of another institution, 403 without the institution write permission. A cancelled event is not scheduled again; register a new one.
 - Published events (`parkingconfiguration.domain.model.events`), stored in the same transaction as the change: `CampusEventProvided` (campusEventId, tenantId, parkingLotId, startAt, endAt, impact) and `CampusEventCancelled` (same fields without impact). A null `parkingLotId` means every parking lot of the institution.
 - `ParkingConfigurationContextFacade.activeParkingLotIds()` and `predictionProfileOf(lotId, from, to)` are internal reads for system jobs and listeners (they do not check the caller) and never back a REST endpoint.
 
@@ -93,7 +93,7 @@ Each bounded context owns a PostgreSQL schema, with no foreign keys between sche
 - History (`OccupancySchedulers`, each job with ShedLock): one snapshot per zone every minute, kept 8 weeks (the window of the Prediction fallback); vehicle passages (`occupancy.vehicle_passages`) and the deduplication log of sensor events are kept 7 days. An hourly job deletes older rows.
 - Prediction reads that history only through the facade: `lotOccupancyAt(lotId, at, tolerance)` (lot totals of the snapshot closest to a moment) and `weeklySlotAverage(lotId, slotStart, slotLength, weeks)` (average occupancy of the same weekday and slot over up to 8 past weeks, with how many weeks had data). Both are bounded queries on the `(parking_lot_id, taken_at)` index; occupancy is occupied / (free + occupied), so unknown spaces never count.
 - REST: `GET /api/v1/parking-lots/{id}/occupancy`, `GET /api/v1/zones/{id}/occupancy`, `GET /api/v1/levels/{id}/occupancy`, `POST` and `GET /api/v1/zones/{id}/occupancy-snapshots` keep their routes and responses.
-- `GET /api/v1/parking-lots/{id}/spaces/status`: one entry per active space, ordered by `spaceId`, with `spaceId`, `zoneId`, `levelId`, `status` (FREE, OCCUPIED or UNKNOWN), `unknownReason` (only when UNKNOWN), `statusSince` and `lastDetectedAt` (null until the first detection), to overlay on the layout. Any user of the lot's institution can read it, drivers included.
+- `GET /api/v1/parking-lots/{id}/space-statuses`: one entry per active space, ordered by `spaceId`, with `spaceId`, `zoneId`, `levelId`, `status` (FREE, OCCUPIED or UNKNOWN), `unknownReason` (only when UNKNOWN), `statusSince` and `lastDetectedAt` (null until the first detection), to overlay on the layout. Any user of the lot's institution can read it, drivers included.
 - A resource of another institution answers 404 with the same message as a missing one. Without `from` and `to`, the snapshot history covers the last 24 hours.
 
 ### Real-time occupancy (STOMP)
@@ -120,6 +120,15 @@ Each bounded context owns a PostgreSQL schema, with no foreign keys between sche
 ```
 
 The integration tests start the whole application against an empty PostgreSQL in Docker and check that every module migrates into its own schema.
+
+### Acceptance tests (BDD)
+
+The acceptance criteria of the user stories are Gherkin features (in Spanish, as written in the report) under `src/test/resources/features/<module>/`, one file per story and tagged with its id (`@US16`, `@US17`, ...). Cucumber runs them inside `./mvnw test` through `CucumberAcceptanceTest`, with the step definitions in `src/test/java/com/upc/quadrapp/acceptance/`; the steps call the real REST API on the same PostgreSQL test setup as the integration tests.
+
+```bash
+./mvnw test -Dtest=CucumberAcceptanceTest                                # only the acceptance scenarios
+./mvnw test -Dtest=CucumberAcceptanceTest -Dcucumber.filter.tags=@US16   # only one story
+```
 
 ## Container image
 

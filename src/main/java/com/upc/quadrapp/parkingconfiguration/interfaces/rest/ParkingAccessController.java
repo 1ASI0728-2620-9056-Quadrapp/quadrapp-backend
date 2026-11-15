@@ -8,6 +8,7 @@ import com.upc.quadrapp.parkingconfiguration.interfaces.rest.resources.CreateAcc
 import com.upc.quadrapp.parkingconfiguration.interfaces.rest.transform.ParkingConfigurationCommandFromResourceAssembler;
 import com.upc.quadrapp.parkingconfiguration.interfaces.rest.transform.ParkingConfigurationResourceFromEntityAssembler;
 
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -24,12 +25,20 @@ import java.util.List;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping(value = "/api/v1/parking-lots/{parkingLotId}/accesses", produces = MediaType.APPLICATION_JSON_VALUE)
-@Tag(name = "Parking Accesses", description = "")
+@Tag(name = "Parking Accesses", description = "Create and query the accesses of a parking lot.")
 public class ParkingAccessController {
 
     private final ParkingConfigurationCommandService commands;
     private final ParkingConfigurationQueryService queries;
 
+    @Operation(
+            operationId = "createParkingAccess",
+            summary = "Create an access of a parking lot",
+            description = "Institution administrators. Adds an ENTRY, EXIT or BIDIRECTIONAL access to the "
+                    + "parking lot (201); 400 for invalid data, 403 for other roles, 404 when the parking "
+                    + "lot does not exist or belongs to another institution and 409 when the name already "
+                    + "exists in the parking lot."
+    )
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<AccessResource> create(
             @PathVariable Long parkingLotId,
@@ -48,6 +57,12 @@ public class ParkingAccessController {
                 );
     }
 
+    @Operation(
+            operationId = "listParkingAccesses",
+            summary = "List the accesses of a parking lot",
+            description = "Any user of the institution that owns the parking lot. Returns its accesses (200); "
+                    + "404 when the parking lot does not exist or belongs to another institution."
+    )
     @GetMapping
     public ResponseEntity<List<AccessResource>> list(
             @PathVariable Long parkingLotId

@@ -2,13 +2,16 @@ package com.upc.quadrapp.parkingsensing.interfaces.rest;
 
 import com.upc.quadrapp.iam.interfaces.acl.IamContextFacade;
 
+import com.upc.quadrapp.parkingsensing.domain.model.aggregates.Device;
 import com.upc.quadrapp.parkingsensing.domain.model.queries.*;
+import com.upc.quadrapp.parkingsensing.domain.model.valueobjects.HardwareIdentifier;
 import com.upc.quadrapp.parkingsensing.domain.services.DeviceCommandService;
 import com.upc.quadrapp.parkingsensing.domain.services.DeviceQueryService;
 
 import com.upc.quadrapp.parkingsensing.interfaces.rest.resources.*;
 import com.upc.quadrapp.parkingsensing.interfaces.rest.transform.*;
 
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
@@ -37,6 +40,14 @@ public class DeviceController {
     private final DeviceQueryService queries;
     private final IamContextFacade iam;
 
+    @Operation(
+            operationId = "registerDevice",
+            summary = "Register an IoT device",
+            description = "Institution administrators. Registers a device in a parking lot of the institution "
+                    + "(201); 400 for invalid data or a gateway that is not active in the same parking lot, "
+                    + "403 for other roles, 404 when the parking lot is not found and 409 when the hardware "
+                    + "identifier is already registered."
+    )
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<DeviceResource> register(
             @Valid @RequestBody RegisterDeviceResource resource
@@ -66,16 +77,42 @@ public class DeviceController {
                 );
     }
 
+    @Operation(
+            operationId = "listDevices",
+            summary = "List devices",
+            description = "Any user of the institution. Filters by parkingLotId, by hardwareId (0 or 1 device) "
+                    + "or by both, which then apply together; at least one filter is required. Returns the "
+                    + "matching devices (200); 400 without filters or with an invalid filter."
+    )
     @GetMapping
     public ResponseEntity<List<DeviceResource>> list(
-            @RequestParam @Positive Long parkingLotId
+            @RequestParam(required = false) @Positive Long parkingLotId,
+            @RequestParam(required = false) String hardwareId
     ) {
-        var devices = queries.handle(
-                new GetDevicesByParkingLotQuery(
-                        currentInstitutionId(),
-                        parkingLotId
-                )
-        );
+        if (parkingLotId == null && hardwareId == null) {
+            throw new IllegalArgumentException(
+                    "parkingLotId or hardwareId is required."
+            );
+        }
+
+        List<Device> devices;
+
+        if (parkingLotId == null) {
+            devices = queries.handle(
+                    new GetDeviceByHardwareIdQuery(hardwareId)
+            ).stream().toList();
+        } else {
+            var inParkingLot = queries.handle(
+                    new GetDevicesByParkingLotQuery(
+                            currentInstitutionId(),
+                            parkingLotId
+                    )
+            );
+
+            devices = hardwareId == null
+                    ? inParkingLot
+                    : withHardwareId(inParkingLot, hardwareId);
+        }
 
         return ResponseEntity.ok(
                 devices.stream()
@@ -87,6 +124,13 @@ public class DeviceController {
         );
     }
 
+    @Operation(
+            operationId = "getDevice",
+            summary = "Get a device",
+            description = "Any user of the institution that owns the device. Returns the device, decommissioned "
+                    + "ones included (200); 403 for a device of another institution and 404 when it does "
+                    + "not exist."
+    )
     @GetMapping("/{deviceId}")
     public ResponseEntity<DeviceResource> getById(
             @PathVariable @Positive Long deviceId
@@ -106,25 +150,14 @@ public class DeviceController {
         );
     }
 
-    @GetMapping("/by-hardware/{hardwareId}")
-    public ResponseEntity<DeviceResource> getByHardwareId(
-            @PathVariable String hardwareId
-    ) {
-        var device = queries.handle(
-                new GetDeviceByHardwareIdQuery(hardwareId)
-        ).orElseThrow(
-                () -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Device not found."
-                )
-        );
-
-        return ResponseEntity.ok(
-                DeviceResourceFromEntityAssembler
-                        .toResourceFromEntity(device)
-        );
-    }
-
+    @Operation(
+            operationId = "assignDevice",
+            summary = "Assign a device to a space or an access",
+            description = "Institution administrators. Assigns a SPACE_SENSOR to a parking space or a "
+                    + "PASS_SENSOR to an access (200); 400 for invalid data, 403 for other roles, 404 when "
+                    + "the device, space or access is not found and 409 when the space already has a sensor "
+                    + "or the device type does not match."
+    )
     @PutMapping(
             value = "/{deviceId}/assignment",
             consumes = MediaType.APPLICATION_JSON_VALUE
@@ -146,7 +179,14 @@ public class DeviceController {
         );
     }
 
-    @PostMapping("/{deviceId}/decommission")
+    @Operation(
+            operationId = "decommissionDevice",
+            summary = "Decommission a device",
+            description = "Institution administrators. Removes the device logically: it is decommissioned and "
+                    + "can still be read with GET (200); 403 for other roles and 404 when it does not "
+                    + "exist."
+    )
+    @DeleteMapping("/{deviceId}")
     public ResponseEntity<DeviceResource> decommission(
             @PathVariable @Positive Long deviceId
     ) {
@@ -159,6 +199,14 @@ public class DeviceController {
                 DeviceResourceFromEntityAssembler
                         .toResourceFromEntity(updated)
         );
+    }
+
+    private static List<Device> withHardwareId(List<Device> devices, String hardwareId) {
+        String wanted = new HardwareIdentifier(hardwareId).value();
+
+        return devices.stream()
+                .filter(device -> device.getHardwareId().equals(wanted))
+                .toList();
     }
 
     private Long currentInstitutionId() {

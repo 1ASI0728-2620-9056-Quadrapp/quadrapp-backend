@@ -3,6 +3,7 @@ package com.upc.quadrapp.iam.interfaces.rest;
 import com.upc.quadrapp.iam.domain.model.valueobjects.Roles;
 import com.upc.quadrapp.iam.interfaces.rest.resources.RoleResource;
 
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
@@ -22,6 +23,12 @@ import java.util.List;
 @Tag(name = "Roles", description = "Available institutional invitation roles")
 public class RolesController {
 
+    @Operation(
+            operationId = "listInvitationRoles",
+            summary = "List the roles that can be invited",
+            description = "Institution administrators and platform administrators. Returns the roles a user can "
+                    + "be invited with, OPERATOR and ADMIN (200); 403 for other roles."
+    )
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'PLATFORM_ADMIN')")
     public ResponseEntity<List<RoleResource>> getInvitationRoles() {

@@ -6,6 +6,7 @@ import com.upc.quadrapp.occupancy.domain.services.OccupancyQueryService;
 import com.upc.quadrapp.occupancy.interfaces.rest.resources.OccupancySnapshotResource;
 import com.upc.quadrapp.occupancy.interfaces.rest.resources.OccupancySummaryResource;
 import com.upc.quadrapp.occupancy.interfaces.rest.resources.SpaceStatusResource;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,13 @@ public class OccupancyController {
     private final OccupancyCommandService commands;
     private final OccupancyQueryService queries;
 
+    @Operation(
+            operationId = "getLotOccupancy",
+            summary = "Get the current occupancy of a parking lot",
+            description = "Any user of the institution that owns the parking lot. Returns the current space "
+                    + "counts by status (200); 404 when the parking lot does not exist or belongs to "
+                    + "another institution."
+    )
     @GetMapping("/api/v1/parking-lots/{parkingLotId}/occupancy")
     public ResponseEntity<OccupancySummaryResource> getByParkingLot(
             @PathVariable Long parkingLotId
@@ -37,7 +45,14 @@ public class OccupancyController {
         );
     }
 
-    @GetMapping("/api/v1/parking-lots/{parkingLotId}/spaces/status")
+    @Operation(
+            operationId = "listLotSpaceStatuses",
+            summary = "List the current status of each space of a parking lot",
+            description = "Any user of the institution that owns the parking lot. Returns every active space "
+                    + "with its current status, ordered by spaceId (200); 404 when the parking lot does not "
+                    + "exist or belongs to another institution."
+    )
+    @GetMapping("/api/v1/parking-lots/{parkingLotId}/space-statuses")
     public ResponseEntity<List<SpaceStatusResource>> getSpaceStatuses(
             @PathVariable Long parkingLotId
     ) {
@@ -49,6 +64,12 @@ public class OccupancyController {
         );
     }
 
+    @Operation(
+            operationId = "getZoneOccupancy",
+            summary = "Get the current occupancy of a zone",
+            description = "Any user of the institution that owns the zone. Returns the current space counts by "
+                    + "status (200); 404 when the zone does not exist or belongs to another institution."
+    )
     @GetMapping("/api/v1/zones/{zoneId}/occupancy")
     public ResponseEntity<OccupancySummaryResource> getByZone(
             @PathVariable Long zoneId
@@ -58,6 +79,12 @@ public class OccupancyController {
         );
     }
 
+    @Operation(
+            operationId = "getLevelOccupancy",
+            summary = "Get the current occupancy of a level",
+            description = "Any user of the institution that owns the level. Returns the current space counts by "
+                    + "status (200); 404 when the level does not exist or belongs to another institution."
+    )
     @GetMapping("/api/v1/levels/{levelId}/occupancy")
     public ResponseEntity<OccupancySummaryResource> getByLevel(
             @PathVariable Long levelId
@@ -67,6 +94,13 @@ public class OccupancyController {
         );
     }
 
+    @Operation(
+            operationId = "createZoneOccupancySnapshot",
+            summary = "Record an occupancy snapshot of a zone",
+            description = "Any user of the institution that owns the zone. Stores the current counts of the "
+                    + "zone as a snapshot and returns it (201); 404 when the zone does not exist or belongs "
+                    + "to another institution."
+    )
     @PostMapping("/api/v1/zones/{zoneId}/occupancy-snapshots")
     public ResponseEntity<OccupancySnapshotResource> createSnapshot(
             @PathVariable Long zoneId
@@ -78,6 +112,14 @@ public class OccupancyController {
                 .body(OccupancySnapshotResource.from(snapshot));
     }
 
+    @Operation(
+            operationId = "listZoneOccupancySnapshots",
+            summary = "List the occupancy snapshots of a zone",
+            description = "Any user of the institution that owns the zone. Returns the snapshots between from "
+                    + "and to (ISO-8601), or of the last 24 hours when both are omitted (200); 400 when "
+                    + "only one bound is given or from is after to, and 404 when the zone does not exist or "
+                    + "belongs to another institution."
+    )
     @GetMapping("/api/v1/zones/{zoneId}/occupancy-snapshots")
     public ResponseEntity<List<OccupancySnapshotResource>> getSnapshots(
             @PathVariable Long zoneId,

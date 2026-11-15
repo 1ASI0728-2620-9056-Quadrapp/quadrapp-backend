@@ -7,13 +7,17 @@ import com.upc.quadrapp.iam.domain.model.commands.CreateInstitutionCommand;
 import com.upc.quadrapp.iam.domain.model.commands.VerifyInstitutionDomainCommand;
 import com.upc.quadrapp.iam.domain.model.queries.GetInstitutionByIdQuery;
 import com.upc.quadrapp.iam.domain.model.queries.GetInstitutionDomainsQuery;
+import com.upc.quadrapp.iam.domain.model.queries.GetUsersByInstitutionQuery;
 import com.upc.quadrapp.iam.domain.services.InstitutionCommandService;
 import com.upc.quadrapp.iam.domain.services.InstitutionQueryService;
+import com.upc.quadrapp.iam.domain.services.UserQueryService;
 
 import com.upc.quadrapp.iam.interfaces.rest.resources.*;
 import com.upc.quadrapp.iam.interfaces.rest.transform.InstitutionDomainResourceFromEntityAssembler;
 import com.upc.quadrapp.iam.interfaces.rest.transform.InstitutionResourceFromEntityAssembler;
+import com.upc.quadrapp.iam.interfaces.rest.transform.UserResourceFromEntityAssembler;
 
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -36,8 +40,15 @@ public class InstitutionsController {
 
     private final InstitutionCommandService institutionCommandService;
     private final InstitutionQueryService institutionQueryService;
+    private final UserQueryService userQueryService;
     private final CurrentUserService currentUserService;
 
+    @Operation(
+            operationId = "createInstitution",
+            summary = "Create an institution",
+            description = "Platform administrators only. Creates an active institution (201); 400 for invalid "
+                    + "data, 403 for other roles and 409 when the name is already registered."
+    )
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<InstitutionResource> create(
             @Valid @RequestBody CreateInstitutionResource resource
@@ -59,6 +70,12 @@ public class InstitutionsController {
                 );
     }
 
+    @Operation(
+            operationId = "getInstitution",
+            summary = "Get an institution",
+            description = "Users of the institution and platform administrators. Returns the institution (200); "
+                    + "403 for users of another institution and 404 when it does not exist."
+    )
     @GetMapping("/{institutionId}")
     public ResponseEntity<InstitutionResource> getById(
             @PathVariable Long institutionId
@@ -76,6 +93,14 @@ public class InstitutionsController {
         );
     }
 
+    @Operation(
+            operationId = "addInstitutionDomain",
+            summary = "Add an email domain to an institution",
+            description = "Administrators of the institution and platform administrators. Registers the domain, "
+                    + "which a platform administrator must then verify (201); 400 for invalid data or an "
+                    + "unknown institution, 403 for other users and 409 when the institution is inactive or "
+                    + "the domain is already registered."
+    )
     @PostMapping(
             value = "/{institutionId}/domains",
             consumes = MediaType.APPLICATION_JSON_VALUE
@@ -102,6 +127,12 @@ public class InstitutionsController {
                 );
     }
 
+    @Operation(
+            operationId = "listInstitutionDomains",
+            summary = "List the email domains of an institution",
+            description = "Administrators of the institution and platform administrators. Returns the domains "
+                    + "of the institution (200); 403 for other users."
+    )
     @GetMapping("/{institutionId}/domains")
     public ResponseEntity<List<InstitutionDomainResource>> getDomains(
             @PathVariable Long institutionId
@@ -120,10 +151,58 @@ public class InstitutionsController {
         return ResponseEntity.ok(resources);
     }
 
-    @PostMapping("/domains/{domainId}/verify")
-    public ResponseEntity<InstitutionDomainResource> verifyDomain(
-            @PathVariable Long domainId
+    @Operation(
+            operationId = "listInstitutionUsers",
+            summary = "List the users of an institution",
+            description = "Administrators of the institution and platform administrators. Returns the users of "
+                    + "the institution (200); 403 for other users."
+    )
+    @GetMapping("/{institutionId}/users")
+    public ResponseEntity<List<UserResource>> getUsers(
+            @PathVariable Long institutionId
     ) {
+        var users = userQueryService.handle(
+                new GetUsersByInstitutionQuery(institutionId)
+        );
+
+        var resources = users.stream()
+                .map(
+                        UserResourceFromEntityAssembler
+                                ::toResourceFromEntity
+                )
+                .toList();
+
+        return ResponseEntity.ok(resources);
+    }
+
+    @Operation(
+            operationId = "verifyInstitutionDomain",
+            summary = "Verify an email domain of an institution",
+            description = "Platform administrators only. Send {\"status\": \"VERIFIED\"}; any other status is 400. "
+                    + "Returns the verified domain (200); 403 for other roles, 404 when the domain does not "
+                    + "belong to the institution and 409 when the institution is inactive or another "
+                    + "institution already verified the domain."
+    )
+    @PatchMapping(
+            value = "/{institutionId}/domains/{domainId}",
+            consumes = MediaType.APPLICATION_JSON_VALUE
+    )
+    public ResponseEntity<InstitutionDomainResource> updateDomain(
+            @PathVariable Long institutionId,
+            @PathVariable Long domainId,
+            @Valid @RequestBody UpdateInstitutionDomainResource resource
+    ) {
+        boolean ofThisInstitution = institutionQueryService.handle(
+                new GetInstitutionDomainsQuery(institutionId)
+        ).stream().anyMatch(domain -> domain.getId().equals(domainId));
+
+        if (!ofThisInstitution) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Institution domain not found."
+            );
+        }
+
         Long actorId = currentUserService.requireAuthenticatedUserId();
 
         var domain = institutionCommandService.handle(

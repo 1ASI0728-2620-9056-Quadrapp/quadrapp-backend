@@ -148,3 +148,26 @@ class SimulationTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ClientIdTest(unittest.TestCase):
+    def test_default_client_id_is_per_gateway(self):
+        from simulator import client_id_for
+        self.assertEqual(client_id_for("demo-gw-01", None, ["demo-gw-01"]), "quadrapp-sim-demo-gw-01")
+
+    def test_gateway_credential_client_id_is_used_as_given(self):
+        from simulator import client_id_for
+        self.assertEqual(client_id_for("demo-gw-01", "gw-1-demo-gw-01", ["demo-gw-01"]), "gw-1-demo-gw-01")
+
+    def test_a_fixed_client_id_needs_a_single_gateway(self):
+        from simulator import client_id_for
+        with self.assertRaises(SystemExit):
+            client_id_for("gw-a", "gw-1-gw-a", ["gw-a", "gw-b"])
+
+    def test_client_id_option_reads_its_variable(self):
+        import os
+        from unittest import mock
+        from simulator import parse_args
+        with mock.patch.dict(os.environ, {"MQTT_CLIENT_ID": "gw-1-demo-gw-01"}):
+            self.assertEqual(parse_args([]).client_id, "gw-1-demo-gw-01")
+        self.assertEqual(parse_args(["--client-id", "x"]).client_id, "x")
