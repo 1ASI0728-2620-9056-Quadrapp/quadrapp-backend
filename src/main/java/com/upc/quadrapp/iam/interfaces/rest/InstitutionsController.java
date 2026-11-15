@@ -43,6 +43,12 @@ public class InstitutionsController {
     private final UserQueryService userQueryService;
     private final CurrentUserService currentUserService;
 
+    @Operation(
+            operationId = "createInstitution",
+            summary = "Create an institution",
+            description = "Platform administrators only. Creates an active institution (201); 400 for invalid "
+                    + "data, 403 for other roles and 409 when the name is already registered."
+    )
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<InstitutionResource> create(
             @Valid @RequestBody CreateInstitutionResource resource
@@ -64,6 +70,12 @@ public class InstitutionsController {
                 );
     }
 
+    @Operation(
+            operationId = "getInstitution",
+            summary = "Get an institution",
+            description = "Users of the institution and platform administrators. Returns the institution (200); "
+                    + "403 for users of another institution and 404 when it does not exist."
+    )
     @GetMapping("/{institutionId}")
     public ResponseEntity<InstitutionResource> getById(
             @PathVariable Long institutionId
@@ -81,6 +93,14 @@ public class InstitutionsController {
         );
     }
 
+    @Operation(
+            operationId = "addInstitutionDomain",
+            summary = "Add an email domain to an institution",
+            description = "Administrators of the institution and platform administrators. Registers the domain, "
+                    + "which a platform administrator must then verify (201); 400 for invalid data or an "
+                    + "unknown institution, 403 for other users and 409 when the institution is inactive or "
+                    + "the domain is already registered."
+    )
     @PostMapping(
             value = "/{institutionId}/domains",
             consumes = MediaType.APPLICATION_JSON_VALUE
@@ -107,6 +127,12 @@ public class InstitutionsController {
                 );
     }
 
+    @Operation(
+            operationId = "listInstitutionDomains",
+            summary = "List the email domains of an institution",
+            description = "Administrators of the institution and platform administrators. Returns the domains "
+                    + "of the institution (200); 403 for other users."
+    )
     @GetMapping("/{institutionId}/domains")
     public ResponseEntity<List<InstitutionDomainResource>> getDomains(
             @PathVariable Long institutionId
@@ -125,7 +151,12 @@ public class InstitutionsController {
         return ResponseEntity.ok(resources);
     }
 
-    @Operation(summary = "List the users of the institution (its admins and platform admins)")
+    @Operation(
+            operationId = "listInstitutionUsers",
+            summary = "List the users of an institution",
+            description = "Administrators of the institution and platform administrators. Returns the users of "
+                    + "the institution (200); 403 for other users."
+    )
     @GetMapping("/{institutionId}/users")
     public ResponseEntity<List<UserResource>> getUsers(
             @PathVariable Long institutionId
@@ -144,8 +175,14 @@ public class InstitutionsController {
         return ResponseEntity.ok(resources);
     }
 
-    @Operation(summary = "Verify a domain of the institution with {\"status\": \"VERIFIED\"} (platform admins "
-            + "only); any other status is 400 and a domain of another institution is 404")
+    @Operation(
+            operationId = "verifyInstitutionDomain",
+            summary = "Verify an email domain of an institution",
+            description = "Platform administrators only. Send {\"status\": \"VERIFIED\"}; any other status is 400. "
+                    + "Returns the verified domain (200); 403 for other roles, 404 when the domain does not "
+                    + "belong to the institution and 409 when the institution is inactive or another "
+                    + "institution already verified the domain."
+    )
     @PatchMapping(
             value = "/{institutionId}/domains/{domainId}",
             consumes = MediaType.APPLICATION_JSON_VALUE

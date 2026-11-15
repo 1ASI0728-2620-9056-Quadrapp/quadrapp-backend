@@ -10,6 +10,7 @@ import com.upc.quadrapp.parkingconfiguration.domain.services.ParkingConfiguratio
 import com.upc.quadrapp.parkingconfiguration.interfaces.rest.resources.*;
 import com.upc.quadrapp.parkingconfiguration.interfaces.rest.transform.*;
 
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
@@ -36,6 +37,13 @@ public class ParkingLotController {
     private final ParkingConfigurationQueryService queries;
     private final IamContextFacade iam;
 
+    @Operation(
+            operationId = "registerParkingLot",
+            summary = "Register a parking lot",
+            description = "Institution administrators. Registers a parking lot in the institution of the "
+                    + "signed-in user (201); 400 for invalid data, 403 for other roles and 409 when the "
+                    + "name already exists in the institution."
+    )
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ParkingLotResource> register(
             @Valid @RequestBody RegisterParkingLotResource resource
@@ -62,6 +70,12 @@ public class ParkingLotController {
                 );
     }
 
+    @Operation(
+            operationId = "listParkingLots",
+            summary = "List the parking lots of the institution",
+            description = "Any user of an institution. Returns the parking lots of the signed-in user's "
+                    + "institution (200); 403 for users without an institution."
+    )
     @GetMapping
     public ResponseEntity<List<ParkingLotResource>> list() {
 
@@ -83,6 +97,13 @@ public class ParkingLotController {
         );
     }
 
+    @Operation(
+            operationId = "getParkingLot",
+            summary = "Get a parking lot",
+            description = "Any user of an institution. Returns the parking lot (200); 403 for users without an "
+                    + "institution and 404 when the parking lot does not exist or belongs to another "
+                    + "institution."
+    )
     @GetMapping("/{parkingLotId}")
     public ResponseEntity<ParkingLotResource> getById(
             @PathVariable Long parkingLotId

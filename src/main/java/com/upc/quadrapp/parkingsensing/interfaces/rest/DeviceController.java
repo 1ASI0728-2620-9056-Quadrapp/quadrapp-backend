@@ -40,6 +40,14 @@ public class DeviceController {
     private final DeviceQueryService queries;
     private final IamContextFacade iam;
 
+    @Operation(
+            operationId = "registerDevice",
+            summary = "Register an IoT device",
+            description = "Institution administrators. Registers a device in a parking lot of the institution "
+                    + "(201); 400 for invalid data or a gateway that is not active in the same parking lot, "
+                    + "403 for other roles, 404 when the parking lot is not found and 409 when the hardware "
+                    + "identifier is already registered."
+    )
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<DeviceResource> register(
             @Valid @RequestBody RegisterDeviceResource resource
@@ -69,8 +77,13 @@ public class DeviceController {
                 );
     }
 
-    @Operation(summary = "List devices filtered by parkingLotId, by hardwareId (0 or 1 device) or by both, "
-            + "which then apply together; at least one filter is required")
+    @Operation(
+            operationId = "listDevices",
+            summary = "List devices",
+            description = "Any user of the institution. Filters by parkingLotId, by hardwareId (0 or 1 device) "
+                    + "or by both, which then apply together; at least one filter is required. Returns the "
+                    + "matching devices (200); 400 without filters or with an invalid filter."
+    )
     @GetMapping
     public ResponseEntity<List<DeviceResource>> list(
             @RequestParam(required = false) @Positive Long parkingLotId,
@@ -111,6 +124,13 @@ public class DeviceController {
         );
     }
 
+    @Operation(
+            operationId = "getDevice",
+            summary = "Get a device",
+            description = "Any user of the institution that owns the device. Returns the device, decommissioned "
+                    + "ones included (200); 403 for a device of another institution and 404 when it does "
+                    + "not exist."
+    )
     @GetMapping("/{deviceId}")
     public ResponseEntity<DeviceResource> getById(
             @PathVariable @Positive Long deviceId
@@ -130,6 +150,14 @@ public class DeviceController {
         );
     }
 
+    @Operation(
+            operationId = "assignDevice",
+            summary = "Assign a device to a space or an access",
+            description = "Institution administrators. Assigns a SPACE_SENSOR to a parking space or a "
+                    + "PASS_SENSOR to an access (200); 400 for invalid data, 403 for other roles, 404 when "
+                    + "the device, space or access is not found and 409 when the space already has a sensor "
+                    + "or the device type does not match."
+    )
     @PutMapping(
             value = "/{deviceId}/assignment",
             consumes = MediaType.APPLICATION_JSON_VALUE
@@ -151,7 +179,13 @@ public class DeviceController {
         );
     }
 
-    @Operation(summary = "Remove a device logically: it is decommissioned and can still be read with GET")
+    @Operation(
+            operationId = "decommissionDevice",
+            summary = "Decommission a device",
+            description = "Institution administrators. Removes the device logically: it is decommissioned and "
+                    + "can still be read with GET (200); 403 for other roles and 404 when it does not "
+                    + "exist."
+    )
     @DeleteMapping("/{deviceId}")
     public ResponseEntity<DeviceResource> decommission(
             @PathVariable @Positive Long deviceId
