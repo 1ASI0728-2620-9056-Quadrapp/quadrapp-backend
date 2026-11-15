@@ -1,6 +1,63 @@
+import json
 import unittest
 
+import requests
+
 import seed
+
+
+class FakeApi(seed.Api):
+    """Answers each (method, path) with a canned status and JSON body and records every call."""
+
+    def __init__(self, routes: dict):
+        super().__init__("http://api.test")
+        self.routes = routes
+        self.calls = []
+
+    def request(self, method, path, body=None, params=None, allow=()):
+        self.calls.append((method, path, body, params))
+        status, payload = self.routes[(method, path)]
+        response = requests.Response()
+        response.status_code = status
+        response._content = json.dumps(payload).encode()
+        if status >= 400 and status not in allow:
+            raise seed.ApiError(method, path, status, response.text)
+        return response
+
+
+class ResourceEndpointsTest(unittest.TestCase):
+    def test_verifies_an_unverified_domain_with_a_partial_update_of_the_domain(self):
+        api = FakeApi({
+            ("GET", "/api/v1/iam/institutions/7/domains"): (200, [{"id": 3, "domain": "upc.edu.pe", "verified": False}]),
+            ("PATCH", "/api/v1/iam/institutions/7/domains/3"): (200, {"id": 3, "domain": "upc.edu.pe", "verified": True}),
+        })
+
+        domain = seed.ensure_verified_domain(api, 7, "upc.edu.pe")
+
+        self.assertTrue(domain["verified"])
+        self.assertIn(("PATCH", "/api/v1/iam/institutions/7/domains/3", {"status": "VERIFIED"}, None), api.calls)
+
+    def test_finds_a_device_by_filtering_the_devices_collection_by_hardware_id(self):
+        device = {"id": 9, "parkingLotId": 4, "type": "GATEWAY", "status": "ACTIVE"}
+        api = FakeApi({("GET", "/api/v1/devices"): (200, [device])})
+
+        found, created = seed.ensure_device(api, 4, "GW 01", {"type": "GATEWAY"})
+
+        self.assertEqual(found, device)
+        self.assertFalse(created)
+        self.assertEqual(api.calls, [("GET", "/api/v1/devices", None, {"hardwareId": "GW 01"})])
+
+    def test_registers_the_device_when_the_filter_finds_none(self):
+        created_device = {"id": 10, "parkingLotId": 4, "type": "GATEWAY", "status": "ACTIVE"}
+        api = FakeApi({
+            ("GET", "/api/v1/devices"): (200, []),
+            ("POST", "/api/v1/devices"): (201, created_device),
+        })
+
+        found, created = seed.ensure_device(api, 4, "GW-01", {"type": "GATEWAY"})
+
+        self.assertEqual(found, created_device)
+        self.assertTrue(created)
 
 
 class MailParsingTest(unittest.TestCase):
