@@ -79,7 +79,7 @@ Each bounded context owns a PostgreSQL schema, with no foreign keys between sche
 
 ## Parking Configuration: campus events
 
-- `POST /api/v1/calendar-events` schedules an event and `POST /api/v1/calendar-events/{id}/cancellation` cancels it (US35, scenario 3): 200 with the cancelled event (`cancelledAt` set), 409 if it was already cancelled, 404 for a missing event or one of another institution, 403 without the institution write permission. A cancelled event is not scheduled again; register a new one.
+- `POST /api/v1/calendar-events` schedules an event and `PATCH /api/v1/calendar-events/{id}` with `{"status": "CANCELLED"}` cancels it (US35, scenario 3): 200 with the cancelled event (`cancelledAt` set; the event is kept), 400 for any other status, 409 if it was already cancelled, 404 for a missing event or one of another institution, 403 without the institution write permission. A cancelled event is not scheduled again; register a new one.
 - Published events (`parkingconfiguration.domain.model.events`), stored in the same transaction as the change: `CampusEventProvided` (campusEventId, tenantId, parkingLotId, startAt, endAt, impact) and `CampusEventCancelled` (same fields without impact). A null `parkingLotId` means every parking lot of the institution.
 - `ParkingConfigurationContextFacade.activeParkingLotIds()` and `predictionProfileOf(lotId, from, to)` are internal reads for system jobs and listeners (they do not check the caller) and never back a REST endpoint.
 
