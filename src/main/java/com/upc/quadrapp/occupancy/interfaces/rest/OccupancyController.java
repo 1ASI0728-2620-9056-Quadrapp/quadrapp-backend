@@ -6,6 +6,7 @@ import com.upc.quadrapp.occupancy.domain.services.OccupancyQueryService;
 import com.upc.quadrapp.occupancy.interfaces.rest.resources.OccupancySnapshotResource;
 import com.upc.quadrapp.occupancy.interfaces.rest.resources.OccupancySummaryResource;
 import com.upc.quadrapp.occupancy.interfaces.rest.resources.SpaceStatusResource;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -37,7 +38,8 @@ public class OccupancyController {
         );
     }
 
-    @GetMapping("/api/v1/parking-lots/{parkingLotId}/spaces/status")
+    @Operation(summary = "Current status of each active space of the parking lot, ordered by spaceId")
+    @GetMapping("/api/v1/parking-lots/{parkingLotId}/space-statuses")
     public ResponseEntity<List<SpaceStatusResource>> getSpaceStatuses(
             @PathVariable Long parkingLotId
     ) {
