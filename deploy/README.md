@@ -187,7 +187,7 @@ push to main -> test -> image sha-<7 chars> -> deploy (OIDC -> AWS role -> SSM o
 - **No stored keys.** GitHub's OIDC token is exchanged for the role `quadrapp-github-deploy`. Its trust policy only accepts `repo:1ASI0728-2620-9056-Quadrapp/quadrapp-backend:ref:refs/heads/main`, and it may only run `ssm:SendCommand` with `AWS-RunShellScript` on the instance and read the result.
 - **Secrets.** `deploy.sh` writes every `SecureString` under `/quadrapp/prod/` into `.env` with the key of its name (`/quadrapp/prod/JWT_SECRET_BASE64` -> `JWT_SECRET_BASE64`). Keys without a parameter (domains, `ACME_EMAIL`, `BACKUP_S3_URI`...) keep their `.env` value. To change a secret, update the parameter and redeploy; an edit in `.env` alone is overwritten on the next deploy. The instance role reads that path; nothing else does.
 - **Rollback scope.** Only the image goes back. Flyway migrations stay applied and `deploy/` stays at the new commit, so a migration must keep working with the previous version (add columns, do not drop or rename them in the same release).
-- **One deploy at a time.** `deploy.sh` takes a lock, so a newer run waits for an older SSM command.
+- **One deploy at a time, newest wins.** The SSM command takes `/tmp/quadrapp-deploy.lock` before its `git checkout`, so a running deploy never has its files changed under it, and it only deploys the commit that is still the tip of `main`: an older run that gets the lock later is skipped (green, "skipping").
 - **Redeploy** the current `main`: Actions -> backend-image -> Run workflow on `main`.
 
 ```bash

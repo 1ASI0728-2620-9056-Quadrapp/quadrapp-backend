@@ -25,8 +25,11 @@ ready_timeout="${READY_TIMEOUT_SECONDS:-180}"
 command -v aws >/dev/null || die "The AWS CLI is not installed."
 
 # One deploy at a time: a newer workflow run can start while an older SSM command still runs.
-exec 9>/tmp/quadrapp-deploy.lock
-flock -w 900 9 || die "Another deploy is still running."
+# The workflow takes this lock before its git checkout and sets QUADRAPP_DEPLOY_LOCK_HELD.
+if [ -z "${QUADRAPP_DEPLOY_LOCK_HELD:-}" ]; then
+	exec 9>/tmp/quadrapp-deploy.lock
+	flock -w 900 9 || die "Another deploy is still running."
+fi
 
 # Replaces KEY=value in the env file (or appends it) without printing the value. The value is
 # passed through the environment, so awk does not interpret backslashes in it.

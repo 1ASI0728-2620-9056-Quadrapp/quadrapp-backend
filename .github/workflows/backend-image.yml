@@ -93,6 +93,9 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
     env:
       AWS_REGION: us-east-1
       INSTANCE_ID: i-03624d1e88daaf69b
@@ -105,12 +108,19 @@ jobs:
       - name: Deploy through SSM
         run: |
           tag="sha-${GITHUB_SHA::7}"
+          # The lock covers the checkout too, so an older SSM command (from a cancelled run)
+          # never has its files changed under it. Only the current tip of main is deployed:
+          # an older commit that gets the lock later is skipped, its newer run deploys.
           params=$(jq -n --arg sha "$GITHUB_SHA" --arg tag "$tag" '{commands: [
             "set -eu",
+            "exec 9>/tmp/quadrapp-deploy.lock",
+            "flock -w 900 9",
             "cd /home/ubuntu/quadrapp-backend",
-            "sudo -u ubuntu git fetch --quiet --depth 1 origin \($sha)",
+            "sudo -u ubuntu git fetch --quiet --depth 1 origin main",
+            "tip=$(sudo -u ubuntu git rev-parse FETCH_HEAD)",
+            "if [ \"$tip\" != \"\($sha)\" ]; then echo \"main is now at $tip; skipping \($sha).\"; exit 0; fi",
             "sudo -u ubuntu git checkout --quiet --force \($sha)",
-            "bash deploy/scripts/deploy.sh \($tag)"
+            "QUADRAPP_DEPLOY_LOCK_HELD=1 bash deploy/scripts/deploy.sh \($tag)"
           ]}')
           command_id=$(aws ssm send-command --instance-ids "$INSTANCE_ID" \
             --document-name AWS-RunShellScript --comment "deploy $tag" --timeout-seconds 900 \
