@@ -2,11 +2,9 @@ package com.upc.quadrapp.iam.interfaces.rest;
 
 import com.upc.quadrapp.iam.application.internal.outboundservices.security.CurrentUserService;
 
-import com.upc.quadrapp.iam.domain.model.commands.AcceptInvitationCommand;
 import com.upc.quadrapp.iam.domain.model.commands.InviteUserCommand;
 import com.upc.quadrapp.iam.domain.services.UserCommandService;
 
-import com.upc.quadrapp.iam.interfaces.rest.resources.AcceptInvitationResource;
 import com.upc.quadrapp.iam.interfaces.rest.resources.InviteUserResource;
 import com.upc.quadrapp.iam.interfaces.rest.resources.UserResource;
 import com.upc.quadrapp.iam.interfaces.rest.transform.UserResourceFromEntityAssembler;
@@ -53,25 +51,5 @@ public class InvitationsController {
                         UserResourceFromEntityAssembler
                                 .toResourceFromEntity(user)
                 );
-    }
-
-    @PostMapping(
-            value = "/accept",
-            consumes = MediaType.APPLICATION_JSON_VALUE
-    )
-    public ResponseEntity<UserResource> accept(
-            @Valid @RequestBody AcceptInvitationResource resource
-    ) {
-        var user = userCommandService.handle(
-                new AcceptInvitationCommand(
-                        resource.invitationToken(),
-                        resource.fullName()
-                )
-        );
-
-        return ResponseEntity.ok(
-                UserResourceFromEntityAssembler
-                        .toResourceFromEntity(user)
-        );
     }
 }
