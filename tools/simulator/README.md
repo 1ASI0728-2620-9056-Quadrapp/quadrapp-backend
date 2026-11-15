@@ -44,6 +44,16 @@ tools/.venv/bin/python tools/simulator/simulator.py
 
 With the defaults a campus day (06:00-22:00) lasts 16 real minutes. Stop it with Ctrl+C.
 
+### Against a deployed broker
+
+The deployed Mosquitto (`deploy/`) accepts only gateway credentials over TLS. On the server, `deploy/scripts/add-gateway.sh <tenantId> <gatewayHardwareId>` creates one and prints its client id, user name and password (both `gw-<tenantId>-<gatewayHardwareId>`). With the seed file of that deployment:
+
+```bash
+MQTT_BROKER_URL=mqtts://<mqtt host>:8883 \
+MQTT_USERNAME=gw-<tenantId>-<gatewayHardwareId> MQTT_CLIENT_ID=gw-<tenantId>-<gatewayHardwareId> \
+MQTT_PASSWORD='<password>' tools/.venv/bin/python tools/simulator/simulator.py --loop
+```
+
 Watch the messages: `docker compose -f tools/docker-compose.dev.yml exec mosquitto mosquitto_sub -V mqttv5 -t 'quadrapp/#' -v`.
 
 Print the readings without a broker: `tools/.venv/bin/python tools/simulator/simulator.py --dry-run` (JSON lines on stdout).
@@ -55,6 +65,7 @@ Print the readings without a broker: `tools/.venv/bin/python tools/simulator/sim
 | `--seed-file` | `SIM_SEED_FILE` | `tools/out/seed-output.json` |
 | `--broker-url` | `MQTT_BROKER_URL` | `mqtt://127.0.0.1:1883`; `mqtts://host:8883` uses TLS |
 | `--username`, `--password` | `MQTT_USERNAME`, `MQTT_PASSWORD` | none (anonymous) |
+| `--client-id` | `MQTT_CLIENT_ID` | `quadrapp-sim-<gatewayHardwareId>`; a gateway credential only accepts its own client id `gw-<tenantId>-<gatewayHardwareId>` |
 | `--speed` | `SIM_SPEED` | `60` simulated seconds per real second |
 | `--start-hour`, `--end-hour` | `SIM_START_HOUR`, `SIM_END_HOUR` | `6`, `22` |
 | `--loop` | | off; starts the day again after `--end-hour` |
