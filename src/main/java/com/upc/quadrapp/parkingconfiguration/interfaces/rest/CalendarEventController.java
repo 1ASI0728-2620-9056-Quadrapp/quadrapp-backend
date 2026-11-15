@@ -9,6 +9,7 @@ import com.upc.quadrapp.parkingconfiguration.interfaces.rest.resources.*;
 import com.upc.quadrapp.parkingconfiguration.interfaces.rest.transform.CalendarEventCommandFromResourceAssembler;
 import com.upc.quadrapp.parkingconfiguration.interfaces.rest.transform.CalendarEventResourceFromEntityAssembler;
 
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -62,11 +63,20 @@ public class CalendarEventController {
     }
 
     /**
-     * Cancels a scheduled event (US35, scenario 3): 200 with the cancelled event, 409 if it was
-     * already cancelled, 404 if it does not exist or belongs to another institution.
+     * Cancels a scheduled event (US35, scenario 3) with {@code {"status": "CANCELLED"}}: 200 with
+     * the cancelled event, which is kept, 409 if it was already cancelled, 404 if it does not exist
+     * or belongs to another institution, 400 for any other status.
      */
-    @PostMapping("/{calendarEventId}/cancellation")
-    public ResponseEntity<CalendarEventResource> cancel(@PathVariable Long calendarEventId) {
+    @Operation(summary = "Cancel an event with {\"status\": \"CANCELLED\"}; the event is kept and its "
+            + "forecasts are regenerated, any other status is 400")
+    @PatchMapping(
+            value = "/{calendarEventId}",
+            consumes = MediaType.APPLICATION_JSON_VALUE
+    )
+    public ResponseEntity<CalendarEventResource> cancel(
+            @PathVariable Long calendarEventId,
+            @Valid @RequestBody UpdateCalendarEventResource resource
+    ) {
         Long institutionId = requireInstitutionId(
                 iam.getCurrentUser().institutionId()
         );

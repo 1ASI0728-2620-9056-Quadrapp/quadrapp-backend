@@ -5,7 +5,6 @@ import com.upc.quadrapp.iam.application.internal.outboundservices.security.Curre
 import com.upc.quadrapp.iam.domain.model.commands.UpdateNotificationPreferencesCommand;
 import com.upc.quadrapp.iam.domain.model.queries.GetUserByEmailQuery;
 import com.upc.quadrapp.iam.domain.model.queries.GetUserByIdQuery;
-import com.upc.quadrapp.iam.domain.model.queries.GetUsersByInstitutionQuery;
 import com.upc.quadrapp.iam.domain.services.UserCommandService;
 import com.upc.quadrapp.iam.domain.services.UserQueryService;
 
@@ -14,6 +13,7 @@ import com.upc.quadrapp.iam.interfaces.rest.resources.UserResource;
 import com.upc.quadrapp.iam.interfaces.rest.transform.NotificationPreferencesFromResourceAssembler;
 import com.upc.quadrapp.iam.interfaces.rest.transform.UserResourceFromEntityAssembler;
 
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -24,8 +24,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
-
-import java.util.List;
 
 @SecurityRequirement(name = "bearerAuth")
 @RestController
@@ -55,7 +53,7 @@ public class UsersController {
         );
     }
 
-    @GetMapping("/{userId}")
+    @GetMapping("/{userId:\\d+}")
     public ResponseEntity<UserResource> getById(
             @PathVariable Long userId
     ) {
@@ -71,7 +69,9 @@ public class UsersController {
         );
     }
 
-    @GetMapping("/by-email")
+    @Operation(summary = "Find the user with this email (required filter); 404 when there is none "
+            + "or it belongs to another institution")
+    @GetMapping
     public ResponseEntity<UserResource> getByEmail(
             @RequestParam String email
     ) {
@@ -85,24 +85,6 @@ public class UsersController {
         return ResponseEntity.ok(
                 UserResourceFromEntityAssembler.toResourceFromEntity(user)
         );
-    }
-
-    @GetMapping("/institution/{institutionId}")
-    public ResponseEntity<List<UserResource>> getByInstitution(
-            @PathVariable Long institutionId
-    ) {
-        var users = userQueryService.handle(
-                new GetUsersByInstitutionQuery(institutionId)
-        );
-
-        var resources = users.stream()
-                .map(
-                        UserResourceFromEntityAssembler
-                                ::toResourceFromEntity
-                )
-                .toList();
-
-        return ResponseEntity.ok(resources);
     }
 
     @PutMapping(

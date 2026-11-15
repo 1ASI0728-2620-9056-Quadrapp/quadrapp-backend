@@ -16,6 +16,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.event.ApplicationEvents;
 import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -25,6 +26,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -32,8 +34,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Registering a campus event publishes {@code CampusEventProvided} and cancelling it publishes
  * {@code CampusEventCancelled} (US35, scenario 3), which Prediction uses to regenerate forecasts.
- * Cancelling is {@code POST /api/v1/calendar-events/{id}/cancellation}: 200 with the cancelled
- * event, 409 when it was already cancelled, 404 for a missing event or one of another institution.
+ * Cancelling is {@code PATCH /api/v1/calendar-events/{id}} with {@code {"status": "CANCELLED"}}: 200
+ * with the cancelled event, which is kept, 409 when it was already cancelled, 404 for a missing event
+ * or one of another institution, and 400 for any other status.
  */
 @QuadrappIntegrationTest
 @AutoConfigureMockMvc
@@ -82,11 +85,11 @@ class CampusEventPublicationIntegrationTest {
     void cancellingAnEventMarksItAndPublishesCampusEventCancelledOnce() throws Exception {
         long id = schedule();
 
-        mvc.perform(post("/api/v1/calendar-events/{id}/cancellation", id).with(jwt()))
+        mvc.perform(cancel(id))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(id))
                 .andExpect(jsonPath("$.cancelledAt").isNotEmpty());
-        mvc.perform(post("/api/v1/calendar-events/{id}/cancellation", id).with(jwt()))
+        mvc.perform(cancel(id))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message").value("Calendar event is already cancelled."));
 
@@ -103,10 +106,10 @@ class CampusEventPublicationIntegrationTest {
                 + "'CAMPUS_EVENT', 'HIGH', now(), now()) returning id", Long.class, other.institutionId,
                 other.parkingLotId, Timestamp.from(START), Timestamp.from(END));
 
-        mvc.perform(post("/api/v1/calendar-events/{id}/cancellation", foreign).with(jwt()))
+        mvc.perform(cancel(foreign))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("Calendar event not found."));
-        mvc.perform(post("/api/v1/calendar-events/{id}/cancellation", Long.MAX_VALUE).with(jwt()))
+        mvc.perform(cancel(Long.MAX_VALUE))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("Calendar event not found."));
 
@@ -120,9 +123,30 @@ class CampusEventPublicationIntegrationTest {
         long id = schedule();
         when(currentUser.requireAuthenticatedUserId()).thenReturn(own.userId);
 
-        mvc.perform(post("/api/v1/calendar-events/{id}/cancellation", id).with(jwt()))
+        mvc.perform(cancel(id))
                 .andExpect(status().isForbidden());
         assertThat(events.stream(CampusEventCancelled.class)).isEmpty();
+    }
+
+    @Test
+    void theFormerCancellationPathIsGoneAndAnyOtherStatusIsRejected() throws Exception {
+        long id = schedule();
+
+        mvc.perform(post("/api/v1/calendar-events/{id}/cancellation", id).with(jwt()))
+                .andExpect(status().isNotFound());
+        mvc.perform(patch("/api/v1/calendar-events/{id}", id).with(jwt())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"status\": \"SCHEDULED\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("status: must be CANCELLED"));
+
+        assertThat(jdbc.queryForObject("select cancelled_at from configuration.calendar_events where id = ?",
+                Timestamp.class, id)).isNull();
+        assertThat(events.stream(CampusEventCancelled.class)).isEmpty();
+    }
+
+    private MockHttpServletRequestBuilder cancel(long id) {
+        return patch("/api/v1/calendar-events/{id}", id).with(jwt())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"status\": \"CANCELLED\"}");
     }
 
     private long schedule() throws Exception {

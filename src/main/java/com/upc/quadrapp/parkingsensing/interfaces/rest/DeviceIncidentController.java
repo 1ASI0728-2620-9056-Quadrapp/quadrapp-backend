@@ -9,6 +9,7 @@ import com.upc.quadrapp.parkingsensing.domain.services.DeviceIncidentQueryServic
 import com.upc.quadrapp.parkingsensing.interfaces.rest.resources.*;
 import com.upc.quadrapp.parkingsensing.interfaces.rest.transform.*;
 
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
@@ -69,19 +70,21 @@ public class DeviceIncidentController {
                 );
     }
 
+    @Operation(summary = "List the incidents of the institution, newest first, optionally of one parking lot "
+            + "and with one status (OPEN or RESOLVED)")
     @GetMapping
     public ResponseEntity<List<DeviceIncidentResource>> list(
             @RequestParam(required = false)
             @Positive Long parkingLotId,
 
-            @RequestParam(defaultValue = "false")
-            boolean onlyOpen
+            @RequestParam(required = false)
+            String status
     ) {
         var incidents = queries.handle(
                 new GetDeviceIncidentsQuery(
                         currentInstitutionId(),
                         parkingLotId,
-                        onlyOpen
+                        statusFilter(status)
                 )
         );
 
@@ -95,9 +98,14 @@ public class DeviceIncidentController {
         );
     }
 
-    @PostMapping("/{incidentId}/resolve")
+    @Operation(summary = "Resolve an incident with {\"status\": \"RESOLVED\"}; any other status is 400")
+    @PatchMapping(
+            value = "/{incidentId}",
+            consumes = MediaType.APPLICATION_JSON_VALUE
+    )
     public ResponseEntity<DeviceIncidentResource> resolve(
-            @PathVariable @Positive Long incidentId
+            @PathVariable @Positive Long incidentId,
+            @Valid @RequestBody UpdateDeviceIncidentResource resource
     ) {
         var actor = iam.getCurrentUser();
 
@@ -122,6 +130,20 @@ public class DeviceIncidentController {
                 DeviceIncidentResourceFromEntityAssembler
                         .toResourceFromEntity(resolved)
         );
+    }
+
+    private static GetDeviceIncidentsQuery.Status statusFilter(String status) {
+        if (status == null) {
+            return null;
+        }
+
+        try {
+            return GetDeviceIncidentsQuery.Status.valueOf(status);
+        } catch (IllegalArgumentException invalid) {
+            throw new IllegalArgumentException(
+                    "status must be OPEN or RESOLVED."
+            );
+        }
     }
 
     private Long currentInstitutionId() {

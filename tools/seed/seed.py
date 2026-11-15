@@ -235,6 +235,9 @@ class Api:
     def put(self, path: str, body: Any) -> Any:
         return self.request("PUT", path, body=body).json()
 
+    def patch(self, path: str, body: Any) -> Any:
+        return self.request("PATCH", path, body=body).json()
+
 
 class CodeReader:
     """Reads the access code or the invitation link sent to an address."""
@@ -324,7 +327,7 @@ def ensure_institution(platform: Api, config: Config) -> dict:
         log(f"Institution: reusing {institution['id']} ({institution['name']}).")
         return institution
 
-    existing_admin = platform.request("GET", "/api/v1/iam/users/by-email",
+    existing_admin = platform.request("GET", "/api/v1/iam/users",
                                       params={"email": config.admin_email}, allow=(404,))
     if existing_admin.status_code == 200:
         institution = platform.get(f"/api/v1/iam/institutions/{existing_admin.json()['institutionId']}")
@@ -350,7 +353,8 @@ def ensure_verified_domain(platform: Api, institution_id: int, domain: str) -> d
         current = platform.post(f"/api/v1/iam/institutions/{institution_id}/domains", {"domain": domain})
         log(f"Domain: registered {domain}.")
     if not current["verified"]:
-        current = platform.post(f"/api/v1/iam/institutions/domains/{current['id']}/verify")
+        current = platform.patch(f"/api/v1/iam/institutions/{institution_id}/domains/{current['id']}",
+                                 {"status": "VERIFIED"})
         log(f"Domain: verified {domain}.")
     else:
         log(f"Domain: {domain} is already verified.")
@@ -358,7 +362,7 @@ def ensure_verified_domain(platform: Api, institution_id: int, domain: str) -> d
 
 
 def ensure_admin(platform: Api, codes: CodeReader, config: Config, institution_id: int) -> None:
-    response = platform.request("GET", "/api/v1/iam/users/by-email",
+    response = platform.request("GET", "/api/v1/iam/users",
                                 params={"email": config.admin_email}, allow=(404,))
     if response.status_code == 200:
         user = response.json()
@@ -379,7 +383,7 @@ def ensure_admin(platform: Api, codes: CodeReader, config: Config, institution_i
     )
     if not token:
         raise SeedError(f"No invitation arrived for {config.admin_email}.")
-    platform.post("/api/v1/iam/invitations/accept", {"invitationToken": token, "fullName": config.admin_name})
+    platform.post("/api/v1/iam/invitation-acceptances", {"invitationToken": token, "fullName": config.admin_name})
     log(f"Administrator: invited and accepted {config.admin_email}.")
 
 
@@ -447,10 +451,9 @@ def ensure_access(admin: Api, lot_id: int) -> dict:
 
 
 def ensure_device(admin: Api, lot_id: int, hardware_id: str, body: dict) -> tuple[dict, bool]:
-    response = admin.request("GET", f"/api/v1/devices/by-hardware/{urllib.parse.quote(hardware_id, safe='')}",
-                             allow=(403, 404))
-    if response.status_code == 200:
-        device = response.json()
+    response = admin.request("GET", "/api/v1/devices", params={"hardwareId": hardware_id}, allow=(403,))
+    if response.status_code == 200 and response.json():
+        device = response.json()[0]
         if device["parkingLotId"] != lot_id or device["type"] != body["type"]:
             raise SeedError(f"Hardware id {hardware_id} is already a {device['type']} of parking lot "
                             f"{device['parkingLotId']}. Use another --hardware-prefix.")

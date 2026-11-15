@@ -7,13 +7,17 @@ import com.upc.quadrapp.iam.domain.model.commands.CreateInstitutionCommand;
 import com.upc.quadrapp.iam.domain.model.commands.VerifyInstitutionDomainCommand;
 import com.upc.quadrapp.iam.domain.model.queries.GetInstitutionByIdQuery;
 import com.upc.quadrapp.iam.domain.model.queries.GetInstitutionDomainsQuery;
+import com.upc.quadrapp.iam.domain.model.queries.GetUsersByInstitutionQuery;
 import com.upc.quadrapp.iam.domain.services.InstitutionCommandService;
 import com.upc.quadrapp.iam.domain.services.InstitutionQueryService;
+import com.upc.quadrapp.iam.domain.services.UserQueryService;
 
 import com.upc.quadrapp.iam.interfaces.rest.resources.*;
 import com.upc.quadrapp.iam.interfaces.rest.transform.InstitutionDomainResourceFromEntityAssembler;
 import com.upc.quadrapp.iam.interfaces.rest.transform.InstitutionResourceFromEntityAssembler;
+import com.upc.quadrapp.iam.interfaces.rest.transform.UserResourceFromEntityAssembler;
 
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -36,6 +40,7 @@ public class InstitutionsController {
 
     private final InstitutionCommandService institutionCommandService;
     private final InstitutionQueryService institutionQueryService;
+    private final UserQueryService userQueryService;
     private final CurrentUserService currentUserService;
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
@@ -120,10 +125,47 @@ public class InstitutionsController {
         return ResponseEntity.ok(resources);
     }
 
-    @PostMapping("/domains/{domainId}/verify")
-    public ResponseEntity<InstitutionDomainResource> verifyDomain(
-            @PathVariable Long domainId
+    @Operation(summary = "List the users of the institution (its admins and platform admins)")
+    @GetMapping("/{institutionId}/users")
+    public ResponseEntity<List<UserResource>> getUsers(
+            @PathVariable Long institutionId
     ) {
+        var users = userQueryService.handle(
+                new GetUsersByInstitutionQuery(institutionId)
+        );
+
+        var resources = users.stream()
+                .map(
+                        UserResourceFromEntityAssembler
+                                ::toResourceFromEntity
+                )
+                .toList();
+
+        return ResponseEntity.ok(resources);
+    }
+
+    @Operation(summary = "Verify a domain of the institution with {\"status\": \"VERIFIED\"} (platform admins "
+            + "only); any other status is 400 and a domain of another institution is 404")
+    @PatchMapping(
+            value = "/{institutionId}/domains/{domainId}",
+            consumes = MediaType.APPLICATION_JSON_VALUE
+    )
+    public ResponseEntity<InstitutionDomainResource> updateDomain(
+            @PathVariable Long institutionId,
+            @PathVariable Long domainId,
+            @Valid @RequestBody UpdateInstitutionDomainResource resource
+    ) {
+        boolean ofThisInstitution = institutionQueryService.handle(
+                new GetInstitutionDomainsQuery(institutionId)
+        ).stream().anyMatch(domain -> domain.getId().equals(domainId));
+
+        if (!ofThisInstitution) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Institution domain not found."
+            );
+        }
+
         Long actorId = currentUserService.requireAuthenticatedUserId();
 
         var domain = institutionCommandService.handle(

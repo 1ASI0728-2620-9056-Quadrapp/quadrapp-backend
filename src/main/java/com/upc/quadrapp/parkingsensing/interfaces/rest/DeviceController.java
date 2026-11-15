@@ -2,13 +2,16 @@ package com.upc.quadrapp.parkingsensing.interfaces.rest;
 
 import com.upc.quadrapp.iam.interfaces.acl.IamContextFacade;
 
+import com.upc.quadrapp.parkingsensing.domain.model.aggregates.Device;
 import com.upc.quadrapp.parkingsensing.domain.model.queries.*;
+import com.upc.quadrapp.parkingsensing.domain.model.valueobjects.HardwareIdentifier;
 import com.upc.quadrapp.parkingsensing.domain.services.DeviceCommandService;
 import com.upc.quadrapp.parkingsensing.domain.services.DeviceQueryService;
 
 import com.upc.quadrapp.parkingsensing.interfaces.rest.resources.*;
 import com.upc.quadrapp.parkingsensing.interfaces.rest.transform.*;
 
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
@@ -66,16 +69,37 @@ public class DeviceController {
                 );
     }
 
+    @Operation(summary = "List devices filtered by parkingLotId, by hardwareId (0 or 1 device) or by both, "
+            + "which then apply together; at least one filter is required")
     @GetMapping
     public ResponseEntity<List<DeviceResource>> list(
-            @RequestParam @Positive Long parkingLotId
+            @RequestParam(required = false) @Positive Long parkingLotId,
+            @RequestParam(required = false) String hardwareId
     ) {
-        var devices = queries.handle(
-                new GetDevicesByParkingLotQuery(
-                        currentInstitutionId(),
-                        parkingLotId
-                )
-        );
+        if (parkingLotId == null && hardwareId == null) {
+            throw new IllegalArgumentException(
+                    "parkingLotId or hardwareId is required."
+            );
+        }
+
+        List<Device> devices;
+
+        if (parkingLotId == null) {
+            devices = queries.handle(
+                    new GetDeviceByHardwareIdQuery(hardwareId)
+            ).stream().toList();
+        } else {
+            var inParkingLot = queries.handle(
+                    new GetDevicesByParkingLotQuery(
+                            currentInstitutionId(),
+                            parkingLotId
+                    )
+            );
+
+            devices = hardwareId == null
+                    ? inParkingLot
+                    : withHardwareId(inParkingLot, hardwareId);
+        }
 
         return ResponseEntity.ok(
                 devices.stream()
@@ -93,25 +117,6 @@ public class DeviceController {
     ) {
         var device = queries.handle(
                 new GetDeviceByIdQuery(deviceId)
-        ).orElseThrow(
-                () -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Device not found."
-                )
-        );
-
-        return ResponseEntity.ok(
-                DeviceResourceFromEntityAssembler
-                        .toResourceFromEntity(device)
-        );
-    }
-
-    @GetMapping("/by-hardware/{hardwareId}")
-    public ResponseEntity<DeviceResource> getByHardwareId(
-            @PathVariable String hardwareId
-    ) {
-        var device = queries.handle(
-                new GetDeviceByHardwareIdQuery(hardwareId)
         ).orElseThrow(
                 () -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND,
@@ -146,7 +151,8 @@ public class DeviceController {
         );
     }
 
-    @PostMapping("/{deviceId}/decommission")
+    @Operation(summary = "Remove a device logically: it is decommissioned and can still be read with GET")
+    @DeleteMapping("/{deviceId}")
     public ResponseEntity<DeviceResource> decommission(
             @PathVariable @Positive Long deviceId
     ) {
@@ -159,6 +165,14 @@ public class DeviceController {
                 DeviceResourceFromEntityAssembler
                         .toResourceFromEntity(updated)
         );
+    }
+
+    private static List<Device> withHardwareId(List<Device> devices, String hardwareId) {
+        String wanted = new HardwareIdentifier(hardwareId).value();
+
+        return devices.stream()
+                .filter(device -> device.getHardwareId().equals(wanted))
+                .toList();
     }
 
     private Long currentInstitutionId() {

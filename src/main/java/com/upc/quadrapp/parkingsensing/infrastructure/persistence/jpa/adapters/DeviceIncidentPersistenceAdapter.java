@@ -3,7 +3,9 @@ package com.upc.quadrapp.parkingsensing.infrastructure.persistence.jpa.adapters;
 import com.upc.quadrapp.parkingsensing.domain.model.valueobjects.IncidentType;
 import com.upc.quadrapp.parkingsensing.application.internal.outboundservices.persistence.DeviceIncidentPersistencePort;
 import com.upc.quadrapp.parkingsensing.domain.model.entities.DeviceIncident;
+import com.upc.quadrapp.parkingsensing.domain.model.queries.GetDeviceIncidentsQuery;
 
+import com.upc.quadrapp.parkingsensing.infrastructure.persistence.jpa.entities.DeviceIncidentJpaEntity;
 import com.upc.quadrapp.parkingsensing.infrastructure.persistence.jpa.mappers.ParkingSensingJpaMapper;
 import com.upc.quadrapp.parkingsensing.infrastructure.persistence.jpa.repositories.DeviceIncidentJpaRepository;
 
@@ -50,28 +52,30 @@ public class DeviceIncidentPersistenceAdapter implements DeviceIncidentPersisten
     public List<DeviceIncident> findByInstitutionIdAndOptionalParkingLotId(
             Long institutionId,
             Long parkingLotId,
-            boolean onlyOpen
+            GetDeviceIncidentsQuery.Status status
     ) {
-        List<com.upc.quadrapp.parkingsensing.infrastructure.persistence.jpa.entities.DeviceIncidentJpaEntity> result;
+        List<DeviceIncidentJpaEntity> result;
 
         if (parkingLotId == null) {
-            result = onlyOpen
-                    ? repository.findByInstitutionIdAndResolvedAtIsNullOrderByOccurredAtDesc(
-                    institutionId
-            )
-                    : repository.findByInstitutionIdOrderByOccurredAtDesc(
-                    institutionId
-            );
+            result = status == null
+                    ? repository.findByInstitutionIdOrderByOccurredAtDesc(institutionId)
+                    : switch (status) {
+                        case OPEN -> repository.findByInstitutionIdAndResolvedAtIsNullOrderByOccurredAtDesc(
+                                institutionId);
+                        case RESOLVED -> repository.findByInstitutionIdAndResolvedAtIsNotNullOrderByOccurredAtDesc(
+                                institutionId);
+                    };
         } else {
-            result = onlyOpen
-                    ? repository.findByInstitutionIdAndParkingLotIdAndResolvedAtIsNullOrderByOccurredAtDesc(
-                    institutionId,
-                    parkingLotId
-            )
-                    : repository.findByInstitutionIdAndParkingLotIdOrderByOccurredAtDesc(
-                    institutionId,
-                    parkingLotId
-            );
+            result = status == null
+                    ? repository.findByInstitutionIdAndParkingLotIdOrderByOccurredAtDesc(institutionId, parkingLotId)
+                    : switch (status) {
+                        case OPEN -> repository
+                                .findByInstitutionIdAndParkingLotIdAndResolvedAtIsNullOrderByOccurredAtDesc(
+                                        institutionId, parkingLotId);
+                        case RESOLVED -> repository
+                                .findByInstitutionIdAndParkingLotIdAndResolvedAtIsNotNullOrderByOccurredAtDesc(
+                                        institutionId, parkingLotId);
+                    };
         }
 
         return result.stream()
