@@ -12,4 +12,6 @@ public interface DeviceIncidentJpaRepository extends JpaRepository<DeviceInciden
     List<DeviceIncidentJpaEntity> findByInstitutionIdAndResolvedAtIsNullOrderByOccurredAtDesc(Long institutionId);
     List<DeviceIncidentJpaEntity> findByInstitutionIdAndParkingLotIdOrderByOccurredAtDesc(Long institutionId, Long parkingLotId);
     List<DeviceIncidentJpaEntity> findByInstitutionIdAndParkingLotIdAndResolvedAtIsNullOrderByOccurredAtDesc(Long institutionId, Long parkingLotId);
+    List<DeviceIncidentJpaEntity> findByInstitutionIdAndResolvedAtIsNotNullOrderByOccurredAtDesc(Long institutionId);
+    List<DeviceIncidentJpaEntity> findByInstitutionIdAndParkingLotIdAndResolvedAtIsNotNullOrderByOccurredAtDesc(Long institutionId, Long parkingLotId);
 }
