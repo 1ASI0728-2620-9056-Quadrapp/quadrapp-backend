@@ -1,6 +1,7 @@
 package com.upc.quadrapp.parkingconfiguration.interfaces.rest;
 
 import com.upc.quadrapp.iam.interfaces.acl.IamContextFacade;
+import com.upc.quadrapp.parkingconfiguration.domain.model.commands.CancelCalendarEventCommand;
 import com.upc.quadrapp.parkingconfiguration.domain.model.queries.GetCalendarEventsByInstitutionQuery;
 import com.upc.quadrapp.parkingconfiguration.domain.services.CalendarEventCommandService;
 import com.upc.quadrapp.parkingconfiguration.domain.services.CalendarEventQueryService;
@@ -58,6 +59,25 @@ public class CalendarEventController {
                         CalendarEventResourceFromEntityAssembler
                                 .toResourceFromEntity(created)
                 );
+    }
+
+    /**
+     * Cancels a scheduled event (US35, scenario 3): 200 with the cancelled event, 409 if it was
+     * already cancelled, 404 if it does not exist or belongs to another institution.
+     */
+    @PostMapping("/{calendarEventId}/cancellation")
+    public ResponseEntity<CalendarEventResource> cancel(@PathVariable Long calendarEventId) {
+        Long institutionId = requireInstitutionId(
+                iam.getCurrentUser().institutionId()
+        );
+
+        var cancelled = commands.handle(
+                new CancelCalendarEventCommand(institutionId, calendarEventId)
+        );
+
+        return ResponseEntity.ok(
+                CalendarEventResourceFromEntityAssembler.toResourceFromEntity(cancelled)
+        );
     }
 
     @GetMapping

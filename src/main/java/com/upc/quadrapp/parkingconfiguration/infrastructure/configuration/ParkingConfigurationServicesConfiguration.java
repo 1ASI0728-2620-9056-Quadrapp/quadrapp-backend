@@ -11,7 +11,9 @@ import com.upc.quadrapp.parkingconfiguration.application.internal.outboundservic
 
 import com.upc.quadrapp.parkingconfiguration.domain.services.*;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
+import org.springframework.transaction.support.TransactionOperations;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
@@ -60,13 +62,17 @@ public class ParkingConfigurationServicesConfiguration {
             CalendarEventPersistencePort events,
             ParkingLotPersistencePort lots,
             ZonePersistencePort zones,
-            ParkingConfigurationAuthorizationPort authorization
+            ParkingConfigurationAuthorizationPort authorization,
+            ApplicationEventPublisher publisher,
+            TransactionOperations transactions
     ) {
         return new CalendarEventCommandServiceImpl(
                 events,
                 lots,
                 zones,
-                authorization
+                authorization,
+                publisher,
+                transactions
         );
     }
 

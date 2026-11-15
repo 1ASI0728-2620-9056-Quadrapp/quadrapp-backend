@@ -2,6 +2,7 @@ package com.upc.quadrapp.prediction.infrastructure.persistence.jpa.entities;
 
 import com.upc.quadrapp.prediction.domain.model.valueobjects.ConfidenceLevel;
 import com.upc.quadrapp.prediction.domain.model.valueobjects.ForecastMethod;
+import com.upc.quadrapp.prediction.domain.model.valueobjects.ForecastTrigger;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -9,6 +10,7 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.UUID;
 
 @Entity
 @Table(
@@ -65,4 +67,18 @@ public class ForecastJpaEntity {
 
     @Column(name = "abs_error", precision = 5, scale = 2)
     private BigDecimal absoluteError;
+
+    @Column(name = "run_id", nullable = false)
+    private UUID runId;
+
+    @Column(name = "run_slot", nullable = false, columnDefinition = "timestamptz")
+    private Instant runSlot;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "trigger", length = 12)
+    private ForecastTrigger trigger;
+
+    /** When the forecast was observed or marked unobservable; null while it waits in the queue. */
+    @Column(name = "evaluated_at", columnDefinition = "timestamptz")
+    private Instant evaluatedAt;
 }

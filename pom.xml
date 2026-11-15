@@ -30,6 +30,7 @@
         <java.version>25</java.version>
         <spring-modulith.version>2.1.2</spring-modulith.version>
         <shedlock.version>7.11.0</shedlock.version>
+        <onnxruntime.version>1.31.1</onnxruntime.version>
         <paho-mqttv5.version>1.2.5</paho-mqttv5.version>
     </properties>
     <dependencyManagement>
@@ -180,6 +181,13 @@
             <groupId>net.javacrumbs.shedlock</groupId>
             <artifactId>shedlock-provider-jdbc-template</artifactId>
             <version>${shedlock.version}</version>
+        </dependency>
+
+        <!-- Runs the exported forecasting model in process (CPU build; ships linux-x64 and linux-aarch64) -->
+        <dependency>
+            <groupId>com.microsoft.onnxruntime</groupId>
+            <artifactId>onnxruntime</artifactId>
+            <version>${onnxruntime.version}</version>
         </dependency>
 
     </dependencies>

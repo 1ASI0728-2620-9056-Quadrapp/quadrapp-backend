@@ -3,12 +3,19 @@ package com.upc.quadrapp.prediction.domain.model.aggregates;
 import com.upc.quadrapp.prediction.domain.model.valueobjects.ConfidenceLevel;
 import com.upc.quadrapp.prediction.domain.model.valueobjects.ForecastHorizon;
 import com.upc.quadrapp.prediction.domain.model.valueobjects.ForecastMethod;
+import com.upc.quadrapp.prediction.domain.model.valueobjects.ForecastTrigger;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.UUID;
 
+/**
+ * Occupancy forecast of a parking lot for one horizon, produced by one generation run.
+ * {@code runSlot} is the start of the 5-minute slot of the run; {@code trigger} says what started
+ * it and is null only for forecasts saved before runs existed.
+ */
 public record Forecast(
         Long id,
         Long parkingLotId,
@@ -22,9 +29,14 @@ public record Forecast(
         String modelVersion,
         Instant saturationExpectedAt,
         BigDecimal observedOccupancyPct,
-        BigDecimal absoluteError
+        BigDecimal absoluteError,
+        UUID runId,
+        Instant runSlot,
+        ForecastTrigger trigger
 ) {
     public Forecast {
+        Objects.requireNonNull(runId, "Run ID is required.");
+        Objects.requireNonNull(runSlot, "Run slot is required.");
         if (id != null && id <= 0) {
             throw new IllegalArgumentException("Forecast ID must be positive.");
         }
@@ -89,8 +101,12 @@ public record Forecast(
             ConfidenceLevel confidenceLevel,
             ForecastMethod method,
             String modelVersion,
-            Instant saturationExpectedAt
+            Instant saturationExpectedAt,
+            UUID runId,
+            Instant runSlot,
+            ForecastTrigger trigger
     ) {
+        Objects.requireNonNull(trigger, "Trigger is required.");
         return new Forecast(
                 null,
                 parkingLotId,
@@ -104,7 +120,10 @@ public record Forecast(
                 modelVersion,
                 saturationExpectedAt,
                 null,
-                null
+                null,
+                runId,
+                runSlot,
+                trigger
         );
     }
 
@@ -130,7 +149,10 @@ public record Forecast(
                 modelVersion,
                 saturationExpectedAt,
                 observed,
-                error
+                error,
+                runId,
+                runSlot,
+                trigger
         );
     }
 

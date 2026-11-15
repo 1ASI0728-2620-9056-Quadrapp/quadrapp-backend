@@ -13,6 +13,9 @@ public interface ParkingLotPersistencePort {
 
     List<ParkingLot> findByInstitutionId(Long institutionId);
 
+    /** IDs of the parking lots in service, of every institution. */
+    List<Long> findActiveIds();
+
     boolean existsByInstitutionIdAndName(
             Long institutionId,
             String name
