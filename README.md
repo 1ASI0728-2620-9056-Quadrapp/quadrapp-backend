@@ -121,6 +121,15 @@ Each bounded context owns a PostgreSQL schema, with no foreign keys between sche
 
 The integration tests start the whole application against an empty PostgreSQL in Docker and check that every module migrates into its own schema.
 
+### Acceptance tests (BDD)
+
+The acceptance criteria of the user stories are Gherkin features (in Spanish, as written in the report) under `src/test/resources/features/<module>/`, one file per story and tagged with its id (`@US16`, `@US17`, ...). Cucumber runs them inside `./mvnw test` through `CucumberAcceptanceTest`, with the step definitions in `src/test/java/com/upc/quadrapp/acceptance/`; the steps call the real REST API on the same PostgreSQL test setup as the integration tests.
+
+```bash
+./mvnw test -Dtest=CucumberAcceptanceTest                                # only the acceptance scenarios
+./mvnw test -Dtest=CucumberAcceptanceTest -Dcucumber.filter.tags=@US16   # only one story
+```
+
 ## Container image
 
 ```bash
