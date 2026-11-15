@@ -1,6 +1,6 @@
-# Runs the test suite and publishes the backend image to GitHub Container Registry
-# (decision D7b: GitHub Actions -> GHCR -> EC2). Deploying to the instance is a manual
-# step for now; see deploy/README.md.
+# Runs the test suite, publishes the backend image to GitHub Container Registry and, on main,
+# deploys it to the EC2 instance (decision D7b: GitHub Actions -> GHCR -> EC2).
+# See deploy/README.md, "Automatic deploy".
 name: backend-image
 
 on:
@@ -79,3 +79,53 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # Deploys the image of this commit to the EC2 instance, only from main. GitHub's OIDC token is
+  # exchanged for the AWS role quadrapp-github-deploy (no stored keys); its trust policy only
+  # accepts this repository on refs/heads/main and it may only run AWS-RunShellScript on the
+  # instance. deploy/scripts/deploy.sh rolls back to the previous image when the new one does
+  # not answer, and this job then fails.
+  deploy:
+    needs: image
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: us-east-1
+      INSTANCE_ID: i-03624d1e88daaf69b
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::703354833657:role/quadrapp-github-deploy
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy through SSM
+        run: |
+          tag="sha-${GITHUB_SHA::7}"
+          params=$(jq -n --arg sha "$GITHUB_SHA" --arg tag "$tag" '{commands: [
+            "set -eu",
+            "cd /home/ubuntu/quadrapp-backend",
+            "sudo -u ubuntu git fetch --quiet --depth 1 origin \($sha)",
+            "sudo -u ubuntu git checkout --quiet --force \($sha)",
+            "bash deploy/scripts/deploy.sh \($tag)"
+          ]}')
+          command_id=$(aws ssm send-command --instance-ids "$INSTANCE_ID" \
+            --document-name AWS-RunShellScript --comment "deploy $tag" --timeout-seconds 900 \
+            --parameters "$params" --query Command.CommandId --output text)
+          echo "SSM command $command_id deploys $tag."
+          status=Pending
+          for _ in $(seq 1 180); do
+            sleep 5
+            status=$(aws ssm get-command-invocation --command-id "$command_id" \
+              --instance-id "$INSTANCE_ID" --query Status --output text 2>/dev/null || echo Pending)
+            case "$status" in Pending|InProgress|Delayed) ;; *) break ;; esac
+          done
+          aws ssm get-command-invocation --command-id "$command_id" --instance-id "$INSTANCE_ID" \
+            --query '[StandardOutputContent,StandardErrorContent]' --output text || true
+          if [ "$status" != "Success" ]; then
+            echo "::error::Deploy of $tag ended with status $status; see the output above."
+            exit 1
+          fi
