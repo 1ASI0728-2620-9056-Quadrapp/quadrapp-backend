@@ -21,8 +21,8 @@ public class OpenApiConfiguration {
                         .license(new License().name("Apache 2.0")
                                 .url("https://www.apache.org/licenses/LICENSE-2.0.html")))
                 .externalDocs(new ExternalDocumentation()
-                        .description("Quadrapp Wiki Documentation")
-                        .url("https://acme-learning-platform.wiki.github.io/docs"));
+                        .description("Quadrapp backend repository")
+                        .url("https://github.com/1ASI0728-2620-9056-Quadrapp/quadrapp-backend"));
         return openApi;
     }
 }

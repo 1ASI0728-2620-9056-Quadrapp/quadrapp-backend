@@ -1,0 +1,6 @@
+{
+  "version": "test-v1",
+  "features": ["occupancy_pct", "minute_of_day", "day_of_week", "campus_event"],
+  "outputs": {"15": "occupancy_15", "30": "occupancy_30", "45": "occupancy_45", "60": "occupancy_60"},
+  "maeByHorizon": {"15": 2.5, "30": 5.0, "45": 10.0, "60": 30.0}
+}
