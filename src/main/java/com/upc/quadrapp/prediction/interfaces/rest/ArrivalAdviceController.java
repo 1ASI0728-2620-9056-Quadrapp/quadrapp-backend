@@ -33,7 +33,14 @@ public class ArrivalAdviceController {
         this.queries = queries;
     }
 
-    @Operation(summary = "Probability of finding space when arriving in etaMinutes; not stored")
+    @Operation(
+            operationId = "requestArrivalAdvice",
+            summary = "Request arrival advice",
+            description = "Any user of the institution that owns the parking lot. Returns the probability of "
+                    + "finding a free space when arriving at lotId in etaMinutes (0 to 120); nothing is "
+                    + "stored (200). 400 when the body is not exactly lotId and etaMinutes or a value is "
+                    + "invalid, and 404 when the parking lot is not found or no advice is available."
+    )
     @PostMapping(
             value = "/api/v1/arrival-advices",
             consumes = MediaType.APPLICATION_JSON_VALUE,

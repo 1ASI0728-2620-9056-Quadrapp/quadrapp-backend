@@ -28,7 +28,13 @@ public class InvitationAcceptancesController {
 
     private final UserCommandService userCommandService;
 
-    @Operation(summary = "Accept an invitation with its token; public, returns the activated user")
+    @Operation(
+            operationId = "acceptInvitation",
+            summary = "Accept an invitation",
+            description = "Public; the invitation token is the credential. Activates the invited user with its "
+                    + "full name and returns it (200); 400 for invalid data or an unknown token and 409 "
+                    + "when the institution is not active or its email domain is no longer verified."
+    )
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<UserResource> accept(
             @Valid @RequestBody AcceptInvitationResource resource
