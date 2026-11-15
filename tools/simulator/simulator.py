@@ -35,6 +35,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                         help="mqtt://host:port or mqtts://host:port (TLS).")
     parser.add_argument("--username", default=env("MQTT_USERNAME"))
     parser.add_argument("--password", default=env("MQTT_PASSWORD"))
+    parser.add_argument("--client-id", default=env("MQTT_CLIENT_ID"),
+                        help="MQTT client id; a gateway credential requires gw-<tenantId>-<gatewayId>.")
     parser.add_argument("--speed", type=float, default=float(env("SIM_SPEED", "60")),
                         help="Simulated seconds per real second (60: one campus hour per minute).")
     parser.add_argument("--start-hour", type=float, default=float(env("SIM_START_HOUR", "6")))
@@ -54,10 +56,24 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return args
 
 
+def client_id_for(gateway: str, client_id: str | None, gateways: list[str]) -> str:
+    """The client id of one gateway connection: the given one, or quadrapp-sim-<gateway>.
+
+    A gateway credential (deploy/scripts/add-gateway.sh) only accepts its own client id, so a
+    fixed id serves a single gateway.
+    """
+    if not client_id:
+        return f"quadrapp-sim-{gateway}"
+    if len(gateways) != 1:
+        raise SystemExit(f"--client-id serves a single gateway; the seed file has {len(gateways)}.")
+    return client_id
+
+
 class Publisher:
     """One MQTT 5 connection per gateway, as each gateway has its own credential (D3)."""
 
-    def __init__(self, broker_url: str, username: str | None, password: str | None, gateways: list[str]):
+    def __init__(self, broker_url: str, username: str | None, password: str | None, gateways: list[str],
+                 client_id: str | None = None):
         import paho.mqtt.client as mqtt
         from paho.mqtt.enums import CallbackAPIVersion
 
@@ -69,7 +85,7 @@ class Publisher:
         self.clients = {}
         self.pending = []
         for gateway in gateways:
-            client = mqtt.Client(CallbackAPIVersion.VERSION2, client_id=f"quadrapp-sim-{gateway}",
+            client = mqtt.Client(CallbackAPIVersion.VERSION2, client_id=client_id_for(gateway, client_id, gateways),
                                  protocol=mqtt.MQTTv5)
             if username:
                 client.username_pw_set(username, password)
@@ -122,7 +138,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     simulation = ParkingSimulation.from_seed(seed, settings, rng, time.monotonic())
     gateways = [gateway["hardwareId"] for gateway in seed["gateways"]]
-    publisher = None if args.dry_run else Publisher(args.broker_url, args.username, args.password, gateways)
+    publisher = None if args.dry_run else Publisher(args.broker_url, args.username, args.password, gateways,
+                                                    args.client_id)
 
     stop = False
 
